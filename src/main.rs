@@ -1,12 +1,14 @@
 use std::ffi::OsStr;
 use std::fs;
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use std::process::Command;
 
 use clap::Parser;
 use fraction::{Fraction, ToPrimitive};
 use gif::Encoder;
+use indicatif::ProgressIterator;
 use image::{DynamicImage, GenericImageView};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
@@ -55,16 +57,21 @@ fn main() {
             return formats.contains(&file_extension);
         })
         .collect();
+    let count = filtered_files.iter().count();
+    let chunks = (count as f64 / batch_size as f64).ceil();
+    println!("Processing {} files in {} chunks.", count, chunks);
     filtered_files
         .chunks(batch_size)
+        .progress()
         .for_each(|filtered_files_of_files| {
-            filtered_files_of_files.par_iter()
+            filtered_files_of_files
+                .par_iter()
                 .for_each(|file| {
                     let args = args.clone();
                     let path = file.as_ref().unwrap().path();
                     let file_extension = path.extension().and_then(OsStr::to_str);
                     let file_name = path.file_name().unwrap().to_str().unwrap();
-                    println!("loading image: {}", file_name);
+                    // println!("loading image: {}", file_name);
 
                     let _result = match file_extension {
                         None => (),
@@ -77,6 +84,7 @@ fn main() {
                     };
                 })
         });
+    println!("Complete.");
 }
 
 fn process_jpg(path: PathBuf, args: Args) {
@@ -88,12 +96,12 @@ fn process_jpg(path: PathBuf, args: Args) {
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
         let img = crop_jpg_png(img, current_aspect, args.aspect_ratio);
         let img = resize_jpg_png(img, args.max_width);
-        let buff = File::create(new_file_path).unwrap();
+        let buff = File::create(new_file_path.clone()).unwrap();
         let mut buff = BufWriter::new(buff);
         let encoder = JpegEncoder::new_with_quality(&mut buff, 95);
-        println!("saving image: {}", file_name);
         let _result = img.write_with_encoder(encoder).unwrap();
-        println!("{} saved.", file_name);
+        let _result = buff.flush().unwrap();
+        copy_metadata(path.to_str().unwrap(), new_file_path.as_str());
     }
 }
 
@@ -104,8 +112,10 @@ fn process_png(path: PathBuf, args: Args) {
     let img = image::open(path.clone());
     if img.is_ok() {
         let img = resize_jpg_png(img.unwrap(), args.max_width);
-        println!("saving image: {}", file_name);
-        let _result = img.save(new_file_path);
+        // println!("saving image: {}", file_name);
+        let _result = img.save(new_file_path.clone());
+        let source_path = path.to_str().unwrap();
+        copy_metadata_with_exiftool(source_path, new_file_path.as_str());
     }
 }
 
@@ -113,12 +123,12 @@ fn process_gif(path: PathBuf, args: Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let new_file_path = format!("{}{}", args.output, file_name);
     let decoder = gif::DecodeOptions::new();
-// Configure the decoder such that it will expand the image to RGBA.
+    // Configure the decoder such that it will expand the image to RGBA.
     let file = File::open(path.clone()).unwrap();
     let decoder = decoder.read_info(file);
     if decoder.is_ok() {
         let mut decoder = decoder.unwrap();
-        let mut image_file = File::create(new_file_path).unwrap();
+        let mut image_file = File::create(new_file_path.clone()).unwrap();
 
         let mut encoder = Encoder::new(&mut image_file, decoder.width(), decoder.height(), decoder.global_palette().unwrap()).unwrap();
         while let Some(frame) = decoder.read_next_frame().unwrap() {
@@ -126,6 +136,8 @@ fn process_gif(path: PathBuf, args: Args) {
             encoder.write_frame(&frame).unwrap();
         }
     }
+    let source_path = path.to_str().unwrap();
+    copy_metadata_with_exiftool(source_path, new_file_path.as_str());
 }
 
 fn resize_jpg_png(img: DynamicImage, max_width: f64) -> DynamicImage {
@@ -138,7 +150,7 @@ fn resize_jpg_png(img: DynamicImage, max_width: f64) -> DynamicImage {
     let new_height = if current_width > max_width { (max_width / current_width) * current_height } else { current_height } as u32;
 
     let img = if resize {
-        println!("resizing {:?} -> ({},{})", img.dimensions(), new_width, new_height);
+        // println!("resizing {:?} -> ({},{})", img.dimensions(), new_width, new_height);
         return img.resize_exact(new_width, new_height, FilterType::CatmullRom);
     } else {
         img
@@ -164,4 +176,32 @@ fn crop_jpg_png(img: DynamicImage, current_aspect: Fraction, new_aspect: Fractio
     } else { // just right, noop
         img
     }
+}
+
+fn copy_metadata_with_exiftool(source_path: &str, target_path: &str) {
+    //exiftool -TagsFromFile srcimage.jpg "-all:all>all:all" targetimage.jpg
+    let arg = format!("exiftool -overwrite_original -TagsFromFile \"{}\" \"-all:all>all:all\" \"{}\"", source_path, target_path);
+    let error_message = "failed to execute Metadata copy process";
+    let output = if cfg!(target_os = "windows") {
+        Command::new("cmd")
+            .args(["/C", &arg])
+            .output()
+            .expect(error_message)
+    } else {
+        Command::new("sh")
+            .arg("-c")
+            .arg(arg)
+            .output()
+            .expect(error_message)
+    };
+    let _hello = output.stdout;
+}
+
+fn copy_metadata(source_path: &str, target_path: &str) {
+    let meta = rexiv2::Metadata::new_from_path(source_path).unwrap();
+    meta.clear_tag("Exif.Image.ImageLength");
+    meta.clear_tag("Exif.Image.ImageWidth");
+    meta.clear_tag("Exif.Image.YResolution");
+    meta.clear_tag("Exif.Image.XResolution");
+    let _result = meta.save_to_file(target_path);
 }
