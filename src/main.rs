@@ -8,7 +8,7 @@ use std::process::Command;
 use clap::Parser;
 use fraction::{Fraction, ToPrimitive};
 use gif::Encoder;
-use indicatif::ProgressIterator;
+use indicatif::ProgressBar;
 use image::{DynamicImage, GenericImageView};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
@@ -25,21 +25,25 @@ struct Args {
     #[arg(short, long, default_value = "100")]
     batch_size: usize,
 
+    /// Picture formats by extension to process
+    #[arg(short, long, default_value = "gif|jpg|jpeg|png")]
+    formats: String,
+
     /// Input directory for source images
     #[arg(short, long, default_value = "./input/")]
     input: String,
-
-    /// Output directory for processed images
-    #[arg(short, long, default_value = "./output/")]
-    output: String,
 
     /// Max width of image allowed before resizing.
     #[arg(short, long, default_value = "1200")]
     max_width: f64,
 
-    /// Picture formats by extension to process
-    #[arg(short, long, default_value = "gif|jpg|jpeg|png")]
-    formats: String,
+    /// Output directory for processed images
+    #[arg(short, long, default_value = "./output/")]
+    output: String,
+
+    /// JPEG quality
+    #[arg(short, long, default_value = "95")]
+    quality: u8,
 }
 
 fn main() {
@@ -60,19 +64,19 @@ fn main() {
     let count = filtered_files.iter().count();
     let chunks = (count as f64 / batch_size as f64).ceil();
     println!("Processing {} files in {} chunks.", count, chunks);
+
+    let progress_bar = ProgressBar::new( count as u64);
     filtered_files
         .chunks(batch_size)
-        .progress()
         .for_each(|filtered_files_of_files| {
             filtered_files_of_files
                 .par_iter()
                 .for_each(|file| {
+                    progress_bar.inc(1);
                     let args = args.clone();
                     let path = file.as_ref().unwrap().path();
                     let file_extension = path.extension().and_then(OsStr::to_str);
                     let file_name = path.file_name().unwrap().to_str().unwrap();
-                    // println!("loading image: {}", file_name);
-
                     let _result = match file_extension {
                         None => (),
                         Some("jpg" | "jpeg") => process_jpg(path, args),
@@ -84,6 +88,7 @@ fn main() {
                     };
                 })
         });
+    progress_bar.finish();
     println!("Complete.");
 }
 
@@ -98,7 +103,7 @@ fn process_jpg(path: PathBuf, args: Args) {
         let img = resize_jpg_png(img, args.max_width);
         let buff = File::create(new_file_path.clone()).unwrap();
         let mut buff = BufWriter::new(buff);
-        let encoder = JpegEncoder::new_with_quality(&mut buff, 95);
+        let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
         let _result = img.write_with_encoder(encoder).unwrap();
         let _result = buff.flush().unwrap();
         copy_metadata(path.to_str().unwrap(), new_file_path.as_str());
@@ -112,7 +117,6 @@ fn process_png(path: PathBuf, args: Args) {
     let img = image::open(path.clone());
     if img.is_ok() {
         let img = resize_jpg_png(img.unwrap(), args.max_width);
-        // println!("saving image: {}", file_name);
         let _result = img.save(new_file_path.clone());
         let source_path = path.to_str().unwrap();
         copy_metadata_with_exiftool(source_path, new_file_path.as_str());
@@ -150,7 +154,6 @@ fn resize_jpg_png(img: DynamicImage, max_width: f64) -> DynamicImage {
     let new_height = if current_width > max_width { (max_width / current_width) * current_height } else { current_height } as u32;
 
     let img = if resize {
-        // println!("resizing {:?} -> ({},{})", img.dimensions(), new_width, new_height);
         return img.resize_exact(new_width, new_height, FilterType::CatmullRom);
     } else {
         img
