@@ -201,7 +201,5 @@ fn copy_metadata(source_path: &str, target_path: &str) {
     let meta = rexiv2::Metadata::new_from_path(source_path).unwrap();
     meta.clear_tag("Exif.Image.ImageLength");
     meta.clear_tag("Exif.Image.ImageWidth");
-    meta.clear_tag("Exif.Image.YResolution");
-    meta.clear_tag("Exif.Image.XResolution");
     let _result = meta.save_to_file(target_path);
 }
