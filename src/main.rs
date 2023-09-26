@@ -33,7 +33,7 @@ struct Args {
     input: String,
 
     /// Max width of image allowed before resizing.
-    #[arg(short, long, default_value = "1200")]
+    #[arg(short, long, default_value = "1500")]
     max_width: f64,
 
     /// Do not crop the image

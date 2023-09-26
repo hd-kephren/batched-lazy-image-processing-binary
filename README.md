@@ -20,7 +20,7 @@ Options:
   -b, --batch-size <BATCH_SIZE>      Batch sizes of images to process in parallel [default: 100]
   -e, --extensions <EXTENSIONS>      Picture formats by extension to process [default: gif|jpg|jpeg|png]
   -i, --input <INPUT>                Input directory for source images [default: ./input/]
-  -m, --max-width <MAX_WIDTH>        Max width of image allowed before resizing [default: 1200]
+  -m, --max-width <MAX_WIDTH>        Max width of image allowed before resizing [default: 1500]
       --no-crop                      Do not crop the image
       --no-metadata                  Do not copy EXIF/XMP/IPTC Metadata
       --no-resize                    Do not resize the image
