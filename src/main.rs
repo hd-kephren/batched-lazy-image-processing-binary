@@ -26,7 +26,7 @@ struct Args {
 
     /// Picture formats by extension to process
     #[arg(short, long, default_value = "gif|jpg|jpeg|png")]
-    formats: String,
+    extensions: String,
 
     /// Input directory for source images
     #[arg(short, long, default_value = "./input/")]
@@ -35,14 +35,6 @@ struct Args {
     /// Max width of image allowed before resizing.
     #[arg(short, long, default_value = "1200")]
     max_width: f64,
-
-    /// Output directory for processed images
-    #[arg(short, long, default_value = "./output/")]
-    output: String,
-
-    /// JPEG quality
-    #[arg(short, long, default_value = "95")]
-    quality: u8,
 
     /// Do not crop the image
     #[arg(long)]
@@ -56,23 +48,30 @@ struct Args {
     #[arg(long)]
     no_resize: bool,
 
+    /// Output directory for processed images
+    #[arg(short, long, default_value = "./output/")]
+    output: String,
+
+    /// JPEG quality
+    #[arg(short, long, default_value = "95")]
+    quality: u8,
 }
 
 fn main() {
     let args = Args::parse();
     let batch_size = args.batch_size;
     let input = args.input.clone();
-    println!("Settings:\nformats to import: {}\nbatch size: {}\ninput directory: {}\noutput directory: {}\nmax image width: {}\n", args.formats, args.batch_size, args.input, args.output, args.max_width);
+    println!(":::::Settings:::::\nextensions to process: {}\nbatch size: {}\ninput directory: {}\noutput directory: {}\nmax image width: {}\nskip cropping: {}\nskip metadata: {}\nskip resizing: {}\nJPEG quality: {}\n", args.extensions, args.batch_size, args.input, args.output, args.max_width, args.no_crop, args.no_metadata, args.no_resize, args.quality);
     rexiv2::initialize().expect("Unable to initialize 'rexiv2'. Please check the readme.md for external requirements.");
 
     let paths = fs::read_dir(input).unwrap();
-    let formats: Vec<&str> = args.formats.split("|").collect();
+    let extensions: Vec<&str> = args.extensions.split("|").collect();
     let filtered_files: Vec<_> = paths
         .into_iter()
         .filter(|path| {
             let file_name = path.as_ref().unwrap().file_name().into_string().unwrap();
             let file_extension = file_name.split(".").last().unwrap();
-            return formats.contains(&file_extension);
+            return extensions.contains(&file_extension);
         })
         .collect();
     let count = filtered_files.iter().count();
@@ -102,7 +101,7 @@ fn main() {
                 })
         });
     progress_bar.finish();
-    println!("Complete.");
+    println!("\nComplete.");
 }
 
 fn process_jpg(path: PathBuf, args: Args) {

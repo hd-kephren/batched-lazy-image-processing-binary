@@ -18,30 +18,35 @@ Usage: blipb [OPTIONS]
 Options:
   -a, --aspect-ratio <ASPECT_RATIO>  Enforced aspect ratio with center crop [default: 5/7]
   -b, --batch-size <BATCH_SIZE>      Batch sizes of images to process in parallel [default: 100]
-  -f, --formats <FORMATS>            Picture formats by extension to process [default: gif|jpg|jpeg|png]
+  -e, --extensions <EXTENSIONS>      Picture formats by extension to process [default: gif|jpg|jpeg|png]
   -i, --input <INPUT>                Input directory for source images [default: ./input/]
   -m, --max-width <MAX_WIDTH>        Max width of image allowed before resizing [default: 1200]
-  -o, --output <OUTPUT>              Output directory for processed images [default: ./output/]
-  -q, --quality <QUALITY>            JPEG quality [default: 95]
       --no-crop                      Do not crop the image
       --no-metadata                  Do not copy EXIF/XMP/IPTC Metadata
       --no-resize                    Do not resize the image
+  -o, --output <OUTPUT>              Output directory for processed images [default: ./output/]
+  -q, --quality <QUALITY>            JPEG quality [default: 95]
   -h, --help                         Print help
   -V, --version                      Print version
 ```
 **Will run with without any flags using the default directory and settings.*
 
 ### Example Run
+`/blipb --max-width 800 --quality 80`
 ```
-Settings:
-formats to import: gif|jpg|jpeg|png
+:::::Settings:::::
+extensions to process: gif|jpg|jpeg|png
 batch size: 100
 input directory: ./input/
 output directory: ./output/
-max image width: 1200
+max image width: 800
+skip cropping: false
+skip metadata: false
+skip resizing: false
+JPEG quality: 80
 
 Processing 3519 files in 36 chunks.
-███████████████████████████████████████████████████████████████████████████████ 3519/3519
+████████████████████████████████████████████████████████████████████████████████████ 3519/3519
 Complete.
 ```
 
