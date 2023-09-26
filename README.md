@@ -23,6 +23,9 @@ Options:
   -m, --max-width <MAX_WIDTH>        Max width of image allowed before resizing [default: 1200]
   -o, --output <OUTPUT>              Output directory for processed images [default: ./output/]
   -q, --quality <QUALITY>            JPEG quality [default: 95]
+      --no-crop                      Do not crop the image
+      --no-metadata                  Do not copy EXIF/XMP/IPTC Metadata
+      --no-resize                    Do not resize the image
   -h, --help                         Print help
   -V, --version                      Print version
 ```
@@ -43,14 +46,12 @@ Complete.
 ```
 
 ### Image Metadata and External Dependencies
-- Metadata functionality is still very much in flux. Experimenting with multiple tools at the moment.
+- Metadata functionality is still experimental. 
 - Uses the library [**rexiv2**](https://github.com/felixc/rexiv2) to copy Metadata for JPEG images.  
   This is a Rust wrapper for the [**gexiv2**](https://wiki.gnome.org/Projects/gexiv2) library, which is a wrapper around [exiv2](https://exiv2.org/).
-- Uses an external tool [**exiftool**](https://exiftool.org/) to copy Metadata for PNG and GIF images.  
-  I've purposefully included instrumentation around this tool for potential feature expansion. The tool has been around for a long time and is quite powerful.
 
 ## TODOs
-- animated GIF resizing
+- animated GIFs
 - more configuration as flags
 - clean up after being more familiar with Rust
 - file name normalization for SKUs

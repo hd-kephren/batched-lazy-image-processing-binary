@@ -3,7 +3,6 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
-use std::process::Command;
 
 use clap::Parser;
 use fraction::{Fraction, ToPrimitive};
@@ -44,6 +43,19 @@ struct Args {
     /// JPEG quality
     #[arg(short, long, default_value = "95")]
     quality: u8,
+
+    /// Do not crop the image
+    #[arg(long)]
+    no_crop: bool,
+
+    /// Do not copy EXIF/XMP/IPTC Metadata
+    #[arg(long)]
+    no_metadata: bool,
+
+    /// Do not resize the image
+    #[arg(long)]
+    no_resize: bool,
+
 }
 
 fn main() {
@@ -51,6 +63,8 @@ fn main() {
     let batch_size = args.batch_size;
     let input = args.input.clone();
     println!("Settings:\nformats to import: {}\nbatch size: {}\ninput directory: {}\noutput directory: {}\nmax image width: {}\n", args.formats, args.batch_size, args.input, args.output, args.max_width);
+    rexiv2::initialize().expect("Unable to initialize 'rexiv2'. Please check the readme.md for external requirements.");
+
     let paths = fs::read_dir(input).unwrap();
     let formats: Vec<&str> = args.formats.split("|").collect();
     let filtered_files: Vec<_> = paths
@@ -65,7 +79,7 @@ fn main() {
     let chunks = (count as f64 / batch_size as f64).ceil();
     println!("Processing {} files in {} chunks.", count, chunks);
 
-    let progress_bar = ProgressBar::new( count as u64);
+    let progress_bar = ProgressBar::new(count as u64);
     filtered_files
         .chunks(batch_size)
         .for_each(|filtered_files_of_files| {
@@ -80,8 +94,7 @@ fn main() {
                     let _result = match file_extension {
                         None => (),
                         Some("jpg" | "jpeg") => process_jpg(path, args),
-                        Some("png") => process_png(path, args),
-                        Some("gif") => process_gif(path, args),
+                        Some("gif" | "png") => process_gif_png(path, args),
                         Some(ext) => {
                             println!("{} | Image format '{}' not supported.", file_name, ext)
                         }
@@ -99,31 +112,32 @@ fn process_jpg(path: PathBuf, args: Args) {
     if img.is_ok() {
         let img = img.unwrap();
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
-        let img = crop_jpg_png(img, current_aspect, args.aspect_ratio);
-        let img = resize_jpg_png(img, args.max_width);
+        let img = if !args.no_crop { crop_jpg_png(img, current_aspect, args.aspect_ratio) } else { img };
+        let img = if !args.no_crop { resize_jpg_png(img, args.max_width) } else { img };
         let buff = File::create(new_file_path.clone()).unwrap();
         let mut buff = BufWriter::new(buff);
         let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
         let _result = img.write_with_encoder(encoder).unwrap();
         let _result = buff.flush().unwrap();
-        copy_metadata(path.to_str().unwrap(), new_file_path.as_str());
+        if !args.no_metadata {copy_metadata(path.to_str().unwrap(), new_file_path.as_str())};
     }
 }
 
-fn process_png(path: PathBuf, args: Args) {
+fn process_gif_png(path: PathBuf, args: Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let new_file_path = format!("{}{}", args.output, file_name);
-
     let img = image::open(path.clone());
     if img.is_ok() {
-        let img = resize_jpg_png(img.unwrap(), args.max_width);
+        let img = img.unwrap();
+        let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
+        let img = if !args.no_crop { crop_jpg_png(img, current_aspect, args.aspect_ratio) } else { img };
+        let img = if !args.no_crop { resize_jpg_png(img, args.max_width) } else { img };
         let _result = img.save(new_file_path.clone());
-        let source_path = path.to_str().unwrap();
-        copy_metadata_with_exiftool(source_path, new_file_path.as_str());
+        if !args.no_metadata {copy_metadata(path.to_str().unwrap(), new_file_path.as_str())};
     }
 }
 
-fn process_gif(path: PathBuf, args: Args) {
+fn process_animated_gif(path: PathBuf, args: Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let new_file_path = format!("{}{}", args.output, file_name);
     let decoder = gif::DecodeOptions::new();
@@ -140,8 +154,7 @@ fn process_gif(path: PathBuf, args: Args) {
             encoder.write_frame(&frame).unwrap();
         }
     }
-    let source_path = path.to_str().unwrap();
-    copy_metadata_with_exiftool(source_path, new_file_path.as_str());
+    if !args.no_metadata {copy_metadata(path.to_str().unwrap(), new_file_path.as_str())};
 }
 
 fn resize_jpg_png(img: DynamicImage, max_width: f64) -> DynamicImage {
@@ -179,25 +192,6 @@ fn crop_jpg_png(img: DynamicImage, current_aspect: Fraction, new_aspect: Fractio
     } else { // just right, noop
         img
     }
-}
-
-fn copy_metadata_with_exiftool(source_path: &str, target_path: &str) {
-    //exiftool -TagsFromFile srcimage.jpg "-all:all>all:all" targetimage.jpg
-    let arg = format!("exiftool -overwrite_original -TagsFromFile \"{}\" \"-all:all>all:all\" \"{}\"", source_path, target_path);
-    let error_message = "failed to execute Metadata copy process";
-    let output = if cfg!(target_os = "windows") {
-        Command::new("cmd")
-            .args(["/C", &arg])
-            .output()
-            .expect(error_message)
-    } else {
-        Command::new("sh")
-            .arg("-c")
-            .arg(arg)
-            .output()
-            .expect(error_message)
-    };
-    let _hello = output.stdout;
 }
 
 fn copy_metadata(source_path: &str, target_path: &str) {
