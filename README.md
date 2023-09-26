@@ -45,5 +45,5 @@ Complete.
 ## TODOs
 - animated GIF resizing
 - more configuration as flags
-- clean up after becoming more familiarity with Rust
+- clean up after being more familiar with Rust
 - file name normalization for SKUs
