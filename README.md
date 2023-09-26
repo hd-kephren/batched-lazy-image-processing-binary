@@ -42,6 +42,13 @@ Processing 3519 files in 36 chunks.
 Complete.
 ```
 
+### Image Metadata and External Dependencies
+- Metadata functionality is still very much in flux. Experimenting with multiple tools at the moment.
+- Uses the library [**rexiv2**](https://github.com/felixc/rexiv2) to copy Metadata for JPEG images.  
+  This is a Rust wrapper for the [**gexiv2**](https://wiki.gnome.org/Projects/gexiv2) library, which is a wrapper around [exiv2](https://exiv2.org/).
+- Uses an external tool [**exiftool**](https://exiftool.org/) to copy Metadata for PNG and GIF images.  
+  I've purposefully included instrumentation around this tool for potential feature expansion. The tool has been around for a long time and is quite powerful.
+
 ## TODOs
 - animated GIF resizing
 - more configuration as flags
