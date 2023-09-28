@@ -12,6 +12,7 @@ use image::{DynamicImage, GenericImageView};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use rayon::prelude::*;
+use regex::Regex;
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
@@ -61,7 +62,7 @@ fn main() {
     let args = Args::parse();
     let batch_size = args.batch_size;
     let input = args.input.clone();
-    println!(":::::Settings:::::\nextensions to process: {}\nbatch size: {}\ninput directory: {}\noutput directory: {}\nmax image width: {}\nskip cropping: {}\nskip metadata: {}\nskip resizing: {}\nJPEG quality: {}\n", args.extensions, args.batch_size, args.input, args.output, args.max_width, args.no_crop, args.no_metadata, args.no_resize, args.quality);
+    println!(":::::Settings:::::\naspect ratio: {}\nextensions to process: {}\nbatch size: {}\ninput directory: {}\noutput directory: {}\nmax image width: {}\nskip cropping: {}\nskip metadata: {}\nskip resizing: {}\nJPEG quality: {}\n", args.aspect_ratio, args.extensions, args.batch_size, args.input, args.output, args.max_width, args.no_crop, args.no_metadata, args.no_resize, args.quality);
     rexiv2::initialize().expect("Unable to initialize 'rexiv2'. Please check the readme.md for external requirements.");
 
     let paths = fs::read_dir(input).unwrap();
@@ -77,7 +78,7 @@ fn main() {
     let count = filtered_files.iter().count();
     let chunks = (count as f64 / batch_size as f64).ceil();
     println!("Processing {} files in {} chunks.", count, chunks);
-
+    let re_jpg = Regex::new(r"\.jpeg$").unwrap();
     let progress_bar = ProgressBar::new(count as u64);
     filtered_files
         .chunks(batch_size)
@@ -92,7 +93,7 @@ fn main() {
                     let file_name = path.file_name().unwrap().to_str().unwrap();
                     let _result = match file_extension {
                         None => (),
-                        Some("jpg" | "jpeg") => process_jpg(path, args),
+                        Some("jpg" | "jpeg") => process_jpg(path, args, &re_jpg),
                         Some("gif" | "png") => process_gif_png(path, args),
                         Some(ext) => {
                             println!("{} | Image format '{}' not supported.", file_name, ext)
@@ -104,12 +105,14 @@ fn main() {
     println!("\nComplete.");
 }
 
-fn process_jpg(path: PathBuf, args: Args) {
+fn process_jpg(path: PathBuf, args: Args, re_jpg: &Regex) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
-    let new_file_path = format!("{}{}", args.output, file_name);
+    let file_path = format!("{}{}", args.output, file_name);
+
     let img = image::open(path.clone());
     if img.is_ok() {
         let img = img.unwrap();
+        let new_file_path = re_jpg.replace_all(file_path.as_str(), ".jpg").to_string(); //file_path.replace(".jpeg", ".jpg");
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
         let img = if !args.no_crop { crop_jpg_png(img, current_aspect, args.aspect_ratio) } else { img };
         let img = if !args.no_crop { resize_jpg_png(img, args.max_width) } else { img };
