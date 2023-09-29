@@ -55,8 +55,11 @@ Complete.
 - Uses the library [**rexiv2**](https://github.com/felixc/rexiv2) to copy Metadata for JPEG images.  
   This is a Rust wrapper for the [**gexiv2**](https://wiki.gnome.org/Projects/gexiv2) library, which is a wrapper around [exiv2](https://exiv2.org/).
 
-## TODOs
+## TODOs ##
 - animated GIFs
 - more configuration as flags
 - clean up after being more familiar with Rust
 - file name normalization for SKUs
+
+## UI ##
+- [slint](https://slint.rs/)
