@@ -53,7 +53,7 @@ Complete.
 
 ### Image Metadata and External Dependencies
 - Metadata functionality is still experimental. 
-- Uses the library [**rexiv2**](https://github.com/felixc/rexiv2) to copy Metadata for JPEG images.  
+- Uses the library [**rexiv2**](https://github.com/felixc/rexiv2) to copy Metadata for images.  
   This is a Rust wrapper for the [**gexiv2**](https://wiki.gnome.org/Projects/gexiv2) library, which is a wrapper around [exiv2](https://exiv2.org/).
 
 ## TODOs ##
