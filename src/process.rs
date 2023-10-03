@@ -9,6 +9,7 @@ use image::{DynamicImage, ImageBuffer};
 use image::imageops::FilterType;
 use regex::Regex;
 use std::io::Write;
+use std::mem::size_of;
 use crate::structs::Args;
 
 
@@ -31,7 +32,7 @@ pub fn process_image_from_path(path: PathBuf, args: Args) {
         }
     };
 }
-pub fn process_in_memory_image(image: Option<DynamicImage>, args: Args) -> Option<DynamicImage> {
+pub fn process_in_memory_image(image: Option<DynamicImage>, args: Args) -> Vec<u8> {
     match image {
         Some(img) => {
             let re_jpg = Regex::new(r"\.jpeg$").unwrap();
@@ -44,16 +45,20 @@ pub fn process_in_memory_image(image: Option<DynamicImage>, args: Args) -> Optio
             let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
             let _result = img.write_with_encoder(encoder).unwrap();
             let _result = buff.flush().unwrap();
-            let slice = &buff.into_inner().unwrap();
-            return match image::load_from_memory(slice) {
-                Ok(dynamic_image) => Some(dynamic_image),
-                Err(error) => {
-                    println!("error [processing_image] {}", error);
-                    None
-                }
-            }
+            let slice = buff.into_inner().unwrap();
+            slice
         }
-        None => None
+        None => Vec::new()
+    }
+}
+
+pub fn load_image_from_vec(vec: &Vec<u8>) -> Option<DynamicImage> {
+    return match image::load_from_memory(vec) {
+        Ok(dynamic_image) => Some(dynamic_image),
+        Err(error) => {
+            println!("error [processing_image] {}", error);
+            None
+        }
     }
 }
 

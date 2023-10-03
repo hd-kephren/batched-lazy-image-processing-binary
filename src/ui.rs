@@ -1,17 +1,17 @@
 use std::fs::DirEntry;
+use std::mem::size_of;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use eframe::egui;
-use eframe::egui::{Align, ColorImage, ImageData, ImageSource, Slider, SliderOrientation, TextureOptions};
-use eframe::egui::load::Bytes;
+use eframe::egui::{Align, ColorImage, ImageData, Slider, SliderOrientation, TextureOptions};
 use fraction::Fraction;
 use image::DynamicImage;
 use image::imageops::FilterType;
 
 use crate::imports::directory_to_files;
-use crate::process::{process_image_from_path, process_in_memory_image};
+use crate::process::{load_image_from_vec, process_in_memory_image};
 use crate::structs::Args;
 
 pub fn run(settings: Args) {
@@ -33,6 +33,8 @@ struct App {
     input: String,
     output: String,
     files: Vec<std::io::Result<DirEntry>>,
+    file_count: usize,
+    file_selected: usize,
     source_file_name: Option<String>,
     source_path: Option<PathBuf>,
     target_file_path: Option<String>,
@@ -50,6 +52,7 @@ impl App {
         let input_directory = settings.input.as_str();
         let extensions: Vec<&str> = settings.extensions.split("|").collect();
         let files = directory_to_files(input_directory, &extensions);
+        let file_count = files.iter().count();
         let file_name_and_path = if files.iter().count() > 0 {
             let file = files.get(0).unwrap();
             let path = file.as_ref().map(|f| { f.path() }).unwrap();
@@ -73,6 +76,8 @@ impl App {
             input: settings.input.clone(),
             output: settings.output,
             files,
+            file_count,
+            file_selected: 0,
             source_path,
             source_file_name,
             target_file_path: None,
@@ -110,7 +115,16 @@ impl eframe::App for App {
                                 if let Some(path) = rfd::FileDialog::new()
                                     .set_directory(self.input.clone())
                                     .pick_folder() {
+                                    let extensions = self.extensions.split("|").collect();
                                     self.input = path.display().to_string();
+                                    self.files = directory_to_files(path.display().to_string().as_str(), &extensions);
+                                    self.file_count = self.files.iter().count();
+                                    self.file_selected = 0;
+                                    let file = self.files.get(self.file_selected).unwrap();
+                                    let path = file.as_ref().map(|f| { f.path() }).unwrap();
+                                    let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
+                                    self.source_file_name = file_name;
+                                    self.source_path = Some(path);
                                 }
                             }
                         });
@@ -145,11 +159,7 @@ impl eframe::App for App {
                             ui.add_space(checkbox_spacing);
                             ui.checkbox(&mut self.resize, "Resize");
                         });
-                        ui.separator();
-                        ui.horizontal_top(|ui| {
-                            ui.add_space(checkbox_spacing);
-                            ui.checkbox(&mut self.preview, "Live Preview");
-                        });
+
                         ui.separator();
                         ui.horizontal_top(|ui| {
                             ui.set_height(20.0);
@@ -164,7 +174,7 @@ impl eframe::App for App {
                         let image_filter = &self.image_filter.clone();
                         ui.horizontal_top(|ui| {
                             ui.add_space(half_frame_width - 95.0);
-                            egui::ComboBox::from_label("Image Filter Type")
+                            egui::ComboBox::from_label("Image Filter Type (not wired up)")
                                 .selected_text(format!("{image_filter:?}"))
                                 .show_ui(ui, |ui| {
                                     ui.style_mut().wrap = Some(false);
@@ -189,9 +199,33 @@ impl eframe::App for App {
                             .orientation(SliderOrientation::Horizontal)
                             .text("JPEG Quality")
                         );
-                        ui.add_space(2.0);
                     });
-
+                ui.separator();
+                ui.horizontal_top(|ui| {
+                    let slider = Slider::new(&mut self.file_selected, 0usize..=self.file_count - 1)
+                        .clamp_to_range(true)
+                        .smart_aim(true)
+                        .trailing_fill(false)
+                        .orientation(SliderOrientation::Horizontal)
+                        .text(format!(" of {} Files", self.file_count));
+                    if ui.add(slider).changed() {
+                        let file = self.files.get(self.file_selected).unwrap();
+                        let path = file.as_ref().map(|f| { f.path() }).unwrap();
+                        let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
+                        self.source_file_name = file_name;
+                        self.source_path = Some(path);
+                        if self.source_file_name.is_some() && self.source_path.is_some() {
+                            self.source_image = match image::open(self.source_path.clone().unwrap()) {
+                                Ok(image) => Some(image),
+                                Err(error) => None
+                            };
+                        };
+                    };
+                    ui.vertical_centered_justified(|ui| {
+                        ui.checkbox(&mut self.preview, "Live Preview");
+                    });
+                    ui.add_space(2.0);
+                });
                 ui.columns(2, |cols| {
                     if self.preview {
                         let args = Args {
@@ -208,18 +242,22 @@ impl eframe::App for App {
                             ui: true,
                         };
                         if self.source_image.is_some() {
-                            self.target_image = process_in_memory_image(self.source_image.clone(), args.clone());
+                            let buffer = process_in_memory_image(self.source_image.clone(), args.clone());
+                            // println!("buff_len: {}, size_of::<Vec<u8>>: {}, size_of::<u8>: {}", buffer.len(), size_of::<Vec<u8>>(), size_of::<u8>());
+                            self.target_image = load_image_from_vec(&buffer);
                         };
                     }
                     for (i, col) in cols.iter_mut().enumerate() {
                         if i == 0 {
                             col.vertical_centered_justified(|col| {
                                 if self.source_file_name.is_some() && self.source_path.is_some() {
-                                    col.label(format!("Source Image: {}", self.source_file_name.clone().unwrap()));
                                     self.source_image = match image::open(self.source_path.clone().unwrap()) {
                                         Ok(image) => Some(image),
                                         Err(error) => None
                                     };
+                                    let size_in_bytes = self.source_image.as_ref().map(|img| { img.as_bytes().iter().count() });
+                                    col.label(format!("Source Image: {}", self.source_file_name.clone().unwrap()));
+                                    // col.label(format!("Size {} bytes", size_in_bytes.unwrap() * size_of::<u8>()));
                                     render_dynamic_image("source", self.source_image.clone(), col);
                                 } else {
                                     col.label("Source Image: <None>");
@@ -228,9 +266,9 @@ impl eframe::App for App {
                         } else {
                             col.vertical_centered_justified(|col| {
                                 if self.preview && self.target_image.is_some() {
-                                    //let target = self.target_file_path.clone().unwrap();
+                                    let size_in_bytes = self.target_image.as_ref().map(|img| { img.as_bytes().iter().count() });
                                     col.label(format!("Target Image: {}", self.source_file_name.clone().unwrap()));
-                                    // col.label(format!("Quality: {}", self.jpeg_quality));
+                                    // col.label(format!("size {} ", (size_in_bytes.unwrap() as f64)/(size_of::<u8>() as f64)));
                                     render_dynamic_image("preview", self.target_image.clone(), col);
                                     match self.image_filter {
                                         FilterType::Nearest => {}
