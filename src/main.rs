@@ -17,7 +17,7 @@ fn main() {
     let args = Args::parse();
 
     if args.ui {
-        ui::run();
+        ui::run(args);
     } else {
         let batch_size = args.batch_size;
         let input = args.input.as_str();
@@ -29,7 +29,7 @@ fn main() {
         let count = filtered_files.iter().count();
         let chunks = (count as f64 / batch_size as f64).ceil();
         println!("Processing {} files in {} chunks.", count, chunks);
-        let re_jpg = Regex::new(r"\.jpeg$").unwrap();
+
         let progress_bar = ProgressBar::new(count as u64);
         filtered_files
             .chunks(batch_size)
@@ -38,7 +38,7 @@ fn main() {
                     .par_iter()
                     .for_each(|file| {
                         progress_bar.inc(1);
-                        process_image(file, args.clone(), &re_jpg);
+                        process_image(file, args.clone());
                     })
             });
         progress_bar.finish();

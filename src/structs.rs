@@ -1,7 +1,9 @@
+use std::path::PathBuf;
 use clap::Parser;
 use fraction::Fraction;
+use image::DynamicImage;
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Default)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// Enforced aspect ratio with center crop
@@ -22,7 +24,7 @@ pub struct Args {
 
     /// Max width of image allowed before resizing.
     #[arg(short, long, default_value = "1500")]
-    pub max_width: f64,
+    pub max_width: u32,
 
     /// Do not crop the image
     #[arg(long)]
@@ -47,4 +49,9 @@ pub struct Args {
     /// Initialize with UI
     #[arg(long)]
     pub ui: bool,
+}
+#[derive(Default)]
+pub struct LoadedImage {
+    pub path: PathBuf,
+    pub file_name: String
 }

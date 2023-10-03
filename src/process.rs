@@ -11,14 +11,22 @@ use regex::Regex;
 use std::io::Write;
 use crate::structs::Args;
 
-pub fn process_image(file: &std::io::Result<DirEntry>, args: Args, re_jpg: &Regex) {
+
+
+pub fn process_image(file: &std::io::Result<DirEntry>, args: Args) {
     let args = args.clone();
     let path = file.as_ref().unwrap().path();
+    process_image_from_path(path, args);
+}
+
+pub fn process_image_from_path(path: PathBuf, args: Args) {
+
+    let args = args.clone();
     let file_extension = path.extension().and_then(OsStr::to_str);
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let _result = match file_extension {
         None => (),
-        Some("jpg" | "jpeg") => process_jpg(path, args, re_jpg),
+        Some("jpg" | "jpeg") => process_jpg(path, args),
         Some("gif" | "png") => process_gif_png(path, args),
         Some(ext) => {
             println!("{} | Image format '{}' not supported.", file_name, ext)
@@ -26,10 +34,10 @@ pub fn process_image(file: &std::io::Result<DirEntry>, args: Args, re_jpg: &Rege
     };
 }
 
-fn process_jpg(path: PathBuf, args: Args, re_jpg: &Regex) {
+fn process_jpg(path: PathBuf, args: Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let file_path = format!("{}{}", args.output, file_name);
-
+    let re_jpg = Regex::new(r"\.jpeg$").unwrap();
     let img = image::open(path.clone());
     if img.is_ok() {
         let img = img.unwrap();
@@ -79,7 +87,8 @@ fn process_animated_gif(path: PathBuf, args: Args) {
     }
     if !args.no_metadata { copy_metadata(path.to_str().unwrap(), new_file_path.as_str()) };
 }
-pub fn resize_jpg_png(img: DynamicImage, max_width: f64) -> DynamicImage {
+pub fn resize_jpg_png(img: DynamicImage, max_width: u32) -> DynamicImage {
+    let max_width = max_width as f64;
     let current_width = img.width() as f64;
     let current_height = img.height() as f64;
 
