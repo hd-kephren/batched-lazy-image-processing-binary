@@ -5,12 +5,11 @@ use std::path::PathBuf;
 use fraction::{Fraction, ToPrimitive};
 use gif::Encoder;
 use image::codecs::jpeg::JpegEncoder;
-use image::DynamicImage;
+use image::{DynamicImage, ImageBuffer};
 use image::imageops::FilterType;
 use regex::Regex;
 use std::io::Write;
 use crate::structs::Args;
-
 
 
 pub fn process_image(file: &std::io::Result<DirEntry>, args: Args) {
@@ -20,7 +19,6 @@ pub fn process_image(file: &std::io::Result<DirEntry>, args: Args) {
 }
 
 pub fn process_image_from_path(path: PathBuf, args: Args) {
-
     let args = args.clone();
     let file_extension = path.extension().and_then(OsStr::to_str);
     let file_name = path.file_name().unwrap().to_str().unwrap();
@@ -33,6 +31,32 @@ pub fn process_image_from_path(path: PathBuf, args: Args) {
         }
     };
 }
+pub fn process_in_memory_image(image: Option<DynamicImage>, args: Args) -> Option<DynamicImage> {
+    match image {
+        Some(img) => {
+            let re_jpg = Regex::new(r"\.jpeg$").unwrap();
+            // let new_file_path = re_jpg.replace_all(file_path.as_str(), ".jpg").to_string(); //file_path.replace(".jpeg", ".jpg");
+            let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
+            let img = if !args.no_crop { crop_jpg_png(img, current_aspect, args.aspect_ratio) } else { img };
+            let img = if !args.no_crop { resize_jpg_png(img, args.max_width) } else { img };
+            let inner = Vec::new();
+            let mut buff = BufWriter::new(inner);
+            let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
+            let _result = img.write_with_encoder(encoder).unwrap();
+            let _result = buff.flush().unwrap();
+            let slice = &buff.into_inner().unwrap();
+            return match image::load_from_memory(slice) {
+                Ok(dynamic_image) => Some(dynamic_image),
+                Err(error) => {
+                    println!("error [processing_image] {}", error);
+                    None
+                }
+            }
+        }
+        None => None
+    }
+}
+
 
 fn process_jpg(path: PathBuf, args: Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
@@ -53,6 +77,8 @@ fn process_jpg(path: PathBuf, args: Args) {
         if !args.no_metadata { copy_metadata(path.to_str().unwrap(), new_file_path.as_str()) };
     }
 }
+
+
 
 fn process_gif_png(path: PathBuf, args: Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
@@ -87,6 +113,7 @@ fn process_animated_gif(path: PathBuf, args: Args) {
     }
     if !args.no_metadata { copy_metadata(path.to_str().unwrap(), new_file_path.as_str()) };
 }
+
 pub fn resize_jpg_png(img: DynamicImage, max_width: u32) -> DynamicImage {
     let max_width = max_width as f64;
     let current_width = img.width() as f64;

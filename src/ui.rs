@@ -11,7 +11,7 @@ use image::DynamicImage;
 use image::imageops::FilterType;
 
 use crate::imports::directory_to_files;
-use crate::process::process_image_from_path;
+use crate::process::{process_image_from_path, process_in_memory_image};
 use crate::structs::Args;
 
 pub fn run(settings: Args) {
@@ -207,10 +207,9 @@ impl eframe::App for App {
                             quality: self.jpeg_quality as u8,
                             ui: true,
                         };
-                        if self.source_file_name.is_some() && self.source_path.is_some() {
-                            process_image_from_path(self.source_path.clone().unwrap(), args.clone());
-                            self.target_file_path = Some(format!("{}{}", args.output, self.source_file_name.clone().unwrap()));
-                        }
+                        if self.source_image.is_some() {
+                            self.target_image = process_in_memory_image(self.source_image.clone(), args.clone());
+                        };
                     }
                     for (i, col) in cols.iter_mut().enumerate() {
                         if i == 0 {
@@ -228,14 +227,10 @@ impl eframe::App for App {
                             });
                         } else {
                             col.vertical_centered_justified(|col| {
-                                if self.preview && self.target_file_path.is_some() {
-                                    let target = self.target_file_path.clone().unwrap();
-                                    col.label(format!("Target Image: {}", target));
-                                    col.label(format!("Quality: {}", self.jpeg_quality));
-                                    self.target_image = match image::open(self.target_file_path.clone().unwrap()) {
-                                        Ok(image) => Some(image),
-                                        Err(error) => None
-                                    };
+                                if self.preview && self.target_image.is_some() {
+                                    //let target = self.target_file_path.clone().unwrap();
+                                    col.label(format!("Target Image: {}", self.source_file_name.clone().unwrap()));
+                                    // col.label(format!("Quality: {}", self.jpeg_quality));
                                     render_dynamic_image("preview", self.target_image.clone(), col);
                                     match self.image_filter {
                                         FilterType::Nearest => {}
@@ -257,7 +252,7 @@ impl eframe::App for App {
 }
 
 
-fn render_dynamic_image(name: &str, optional_image: Option<DynamicImage>,ui: &mut egui::Ui) {
+fn render_dynamic_image(name: &str, optional_image: Option<DynamicImage>, ui: &mut egui::Ui) {
     match optional_image {
         Some(dynamic_image) => {
             let size = [dynamic_image.width() as _, dynamic_image.height() as _];
