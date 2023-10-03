@@ -26,6 +26,7 @@ Options:
       --no-resize                    Do not resize the image
   -o, --output <OUTPUT>              Output directory for processed images [default: ./output/]
   -q, --quality <QUALITY>            JPEG quality [default: 95]
+      --ui                           Initialize with UI (still under major development)
   -h, --help                         Print help
   -V, --version                      Print version
 ```

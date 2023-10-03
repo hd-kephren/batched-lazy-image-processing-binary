@@ -46,7 +46,7 @@ pub struct Args {
     #[arg(short, long, default_value = "95")]
     pub quality: u8,
 
-    /// Initialize with UI
+    /// Initialize with UI (still under major development)
     #[arg(long)]
     pub ui: bool,
 }
