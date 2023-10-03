@@ -1,37 +1,26 @@
-use std::ffi::OsStr;
 use std::fs::DirEntry;
-use std::mem::size_of;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use eframe::egui;
-use eframe::egui::{Align, ColorImage, ImageOptions, ImageSource, SizeHint, Slider, SliderOrientation, TextureOptions};
+use eframe::egui::{Align, ColorImage, ImageData, ImageSource, Slider, SliderOrientation, TextureOptions};
 use eframe::egui::load::Bytes;
 use fraction::Fraction;
-use uuid::Uuid;
+use image::DynamicImage;
+use image::imageops::FilterType;
 
 use crate::imports::directory_to_files;
 use crate::process::process_image_from_path;
-use crate::structs::{Args, LoadedImage};
+use crate::structs::Args;
 
 pub fn run(settings: Args) {
     let native_options = eframe::NativeOptions::default();
     let _ = eframe::run_native("Batched Lazy Image Processing Binary", native_options, Box::new(|cc| Box::new(App::new(cc, settings))));
 }
 
-fn load_image_from_memory(image_data: &[u8]) -> Result<ColorImage, image::ImageError> {
-    let image = image::load_from_memory(image_data)?;
-    let size = [image.width() as _, image.height() as _];
-    let image_buffer = image.to_rgba8();
-    let pixels = image_buffer.as_flat_samples();
-    Ok(ColorImage::from_rgba_unmultiplied(
-        size,
-        pixels.as_slice(),
-    ))
-}
-
-#[derive(Default)]
 struct App {
+    image_filter: FilterType,
     jpeg_quality: u32,
     max_width: u32,
     aspect_ratio: String,
@@ -47,6 +36,8 @@ struct App {
     source_file_name: Option<String>,
     source_path: Option<PathBuf>,
     target_file_path: Option<String>,
+    source_image: Option<DynamicImage>,
+    target_image: Option<DynamicImage>,
 }
 
 impl App {
@@ -59,16 +50,17 @@ impl App {
         let input_directory = settings.input.as_str();
         let extensions: Vec<&str> = settings.extensions.split("|").collect();
         let files = directory_to_files(input_directory, &extensions);
-        let file_name_and_path= if files.iter().count() > 0 {
+        let file_name_and_path = if files.iter().count() > 0 {
             let file = files.get(0).unwrap();
-            let path = file.as_ref().map (|f| {f.path()}).unwrap();
+            let path = file.as_ref().map(|f| { f.path() }).unwrap();
             let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
             (file_name, Some(path))
         } else {
-            (None,None)
+            (None, None)
         };
         let (source_file_name, source_path) = file_name_and_path;
         let this = App {
+            image_filter: FilterType::Lanczos3,
             jpeg_quality: (settings.quality as u32),
             max_width: settings.max_width,
             aspect_ratio: settings.aspect_ratio.to_string(),
@@ -77,12 +69,15 @@ impl App {
             crop: !settings.no_crop,
             metadata: !settings.no_metadata,
             resize: !settings.no_resize,
+            preview: false,
             input: settings.input.clone(),
             output: settings.output,
             files,
             source_path,
             source_file_name,
-            ..Default::default()
+            target_file_path: None,
+            source_image: None,
+            target_image: None,
         };
         this
     }
@@ -166,7 +161,21 @@ impl eframe::App for App {
                             ui.label("Aspect Ratio");
                         });
                         ui.separator();
-
+                        let image_filter = &self.image_filter.clone();
+                        ui.horizontal_top(|ui| {
+                            ui.add_space(half_frame_width - 95.0);
+                            egui::ComboBox::from_label("Image Filter Type")
+                                .selected_text(format!("{image_filter:?}"))
+                                .show_ui(ui, |ui| {
+                                    ui.style_mut().wrap = Some(false);
+                                    ui.selectable_value(&mut self.image_filter, FilterType::Nearest, "Nearest Neighbor");
+                                    ui.selectable_value(&mut self.image_filter, FilterType::Triangle, "Linear Filter");
+                                    ui.selectable_value(&mut self.image_filter, FilterType::CatmullRom, "Cubic Filter");
+                                    ui.selectable_value(&mut self.image_filter, FilterType::Gaussian, "Gaussian Filter");
+                                    ui.selectable_value(&mut self.image_filter, FilterType::Lanczos3, "Lanczos with window 3");
+                                });
+                        });
+                        ui.separator();
                         ui.add(Slider::new(&mut self.max_width, 1000u32..=2048u32)
                             .orientation(SliderOrientation::Horizontal)
                             .text("Maximum Width")
@@ -184,7 +193,6 @@ impl eframe::App for App {
                     });
 
                 ui.columns(2, |cols| {
-
                     if self.preview {
                         let args = Args {
                             aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
@@ -209,14 +217,11 @@ impl eframe::App for App {
                             col.vertical_centered_justified(|col| {
                                 if self.source_file_name.is_some() && self.source_path.is_some() {
                                     col.label(format!("Source Image: {}", self.source_file_name.clone().unwrap()));
-                                    egui::ScrollArea::both().show(col, |col| {
-                                        let file_name = format!("bytes://{}", self.source_file_name.clone().unwrap().as_str().replace(" ", "\\ ")).into();
-                                        let bytes: Vec<u8> = std::fs::read(self.source_path.clone().unwrap().clone()).unwrap();
-                                        col.image(ImageSource::Bytes {
-                                            uri: file_name,
-                                            bytes: Bytes::from(bytes),
-                                        });
-                                    });
+                                    self.source_image = match image::open(self.source_path.clone().unwrap()) {
+                                        Ok(image) => Some(image),
+                                        Err(error) => None
+                                    };
+                                    render_dynamic_image("source", self.source_image.clone(), col);
                                 } else {
                                     col.label("Source Image: <None>");
                                 }
@@ -227,16 +232,18 @@ impl eframe::App for App {
                                     let target = self.target_file_path.clone().unwrap();
                                     col.label(format!("Target Image: {}", target));
                                     col.label(format!("Quality: {}", self.jpeg_quality));
-                                    egui::ScrollArea::both().show(col, |col| {
-                                        let id = Uuid::new_v4();
-                                        let file_name = format!("bytes://{}",  self.target_file_path.clone().unwrap()).into();
-                                        let bytes: Vec<u8> = std::fs::read(self.target_file_path.clone().unwrap()).unwrap();
-
-                                        let result = col.image(ImageSource::Bytes {
-                                            uri: file_name,
-                                            bytes: Bytes::from(bytes),
-                                        });
-                                    });
+                                    self.target_image = match image::open(self.target_file_path.clone().unwrap()) {
+                                        Ok(image) => Some(image),
+                                        Err(error) => None
+                                    };
+                                    render_dynamic_image("preview", self.target_image.clone(), col);
+                                    match self.image_filter {
+                                        FilterType::Nearest => {}
+                                        FilterType::Triangle => {}
+                                        FilterType::CatmullRom => {}
+                                        FilterType::Gaussian => {}
+                                        FilterType::Lanczos3 => {}
+                                    }
                                 } else {
                                     col.label("Target Image: <None>");
                                 }
@@ -246,5 +253,42 @@ impl eframe::App for App {
                 });
             });
         });
+    }
+}
+
+
+fn render_dynamic_image(name: &str, optional_image: Option<DynamicImage>,ui: &mut egui::Ui) {
+    match optional_image {
+        Some(dynamic_image) => {
+            let size = [dynamic_image.width() as _, dynamic_image.height() as _];
+            let image_buffer = dynamic_image.to_rgba8();
+            let pixels = image_buffer.as_flat_samples();
+            let color_image_ok: Result<ColorImage, image::ImageError> = Ok(ColorImage::from_rgba_unmultiplied(
+                size,
+                pixels.as_slice(),
+            ));
+            match color_image_ok {
+                Ok(color_image) => {
+                    let arc_color_image = Arc::new(color_image);
+                    let handle = ui.ctx().load_texture(
+                        "preview",
+                        ImageData::Color(
+                            arc_color_image
+                        ),
+                        TextureOptions::default(),
+                    );
+                    ui.vertical_centered_justified(|col| {
+                        egui::ScrollArea::both().show(col, |col| {
+                            col.image((handle.id(), handle.size_vec2()));
+                        });
+                    });
+                }
+                Err(error) => {
+                    println!("image error:{}", error);
+                    return;
+                }
+            };
+        }
+        None => ()
     }
 }
