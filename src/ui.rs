@@ -243,7 +243,7 @@ impl eframe::App for App {
                 ui.columns(2, |cols| {
                     for (i, col) in cols.iter_mut().enumerate() {
                         if i == 0 {
-                            col.vertical_centered_justified(|col| {
+                            col.vertical(|col| {
                                 if self.source_file_name.is_some() && self.source_path.is_some() {
                                     self.source_image = match image::open(self.source_path.as_ref().unwrap()) {
                                         Ok(image) => Some(image),
@@ -291,7 +291,7 @@ impl eframe::App for App {
                                     self.target_texture = build_image_texture("target", target_image, col);
                                 };
                             }
-                            col.vertical_centered_justified(|col| {
+                            col.vertical(|col| {
                                 col.label(format!("Target Image: {}", self.source_file_name.as_ref().unwrap_or(&String::from("<None>"))));
                                 if self.preview {
                                     self.target_texture.as_ref().map(|target_handle| {
