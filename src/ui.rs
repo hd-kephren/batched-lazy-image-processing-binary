@@ -258,7 +258,7 @@ impl eframe::App for App {
                                         };
                                         self.source_texture = build_image_texture("source", &self.source_image, col);
                                         self.source_max_width = self.source_image.as_ref().map(|image| image.width()).unwrap_or(2048u32);
-                                        self.source_min_width = if self.source_max_width < 1000 { self.source_max_width / 2u32 } else { 1000u32 };
+                                        self.source_min_width = if self.source_max_width < 32 { self.source_max_width / 2u32 } else { 32u32 };
                                     };
 
                                     match &self.source_texture {
