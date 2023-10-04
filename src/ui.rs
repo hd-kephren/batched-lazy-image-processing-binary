@@ -201,7 +201,7 @@ impl eframe::App for App {
                                 self.update = true;
                             };
                             ui.add_space(5.0);
-                            ui.vertical_centered_justified(|ui| {
+                            ui.vertical(|ui| {
                                 if ui.checkbox(&mut self.preview, "Live Preview").changed() {
                                     self.update = true;
                                 };
