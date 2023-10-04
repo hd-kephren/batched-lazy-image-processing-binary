@@ -7,7 +7,6 @@ use eframe::egui;
 use eframe::egui::{Align, ColorImage, ImageData, Slider, SliderOrientation, TextureHandle, TextureOptions};
 use fraction::Fraction;
 use image::{DynamicImage, EncodableLayout};
-use image::imageops::FilterType;
 
 use crate::imports::directory_to_files;
 use crate::process::{load_image_from_vec, process_in_memory_image};
@@ -19,7 +18,6 @@ pub fn run(settings: Args) {
 }
 
 struct App {
-    image_filter: FilterType,
     jpeg_quality: u32,
     target_max_width: u32,
     source_max_width: u32,
@@ -39,7 +37,6 @@ struct App {
     source_texture: Option<TextureHandle>,
     target_image: Option<DynamicImage>,
     target_texture: Option<TextureHandle>,
-    background_texture: Option<TextureHandle>,
     update: bool,
 }
 
@@ -64,7 +61,6 @@ impl App {
         };
         let (source_file_name, source_path) = file_name_and_path;
         let this = App {
-            image_filter: FilterType::Lanczos3,
             jpeg_quality: (settings.quality as u32),
             target_max_width: settings.max_width,
             source_max_width: 0u32,
@@ -95,7 +91,6 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             let frame_size = frame.info().window_info.size;
             let half_frame_width = frame_size.x / 2.0;
-            let checkbox_spacing = half_frame_width - 10.0;
             let slider_spacing = half_frame_width - 43.0;
             ui.style_mut().spacing.slider_width = slider_spacing;
             ui.vertical_centered(|ui| {
@@ -158,21 +153,6 @@ impl eframe::App for App {
                                 .horizontal_align(Align::Center);
                             ui.add_sized(size, text);
                             ui.label("Aspect Ratio");
-                        });
-                        ui.separator();
-                        let image_filter = &self.image_filter.clone();
-                        ui.horizontal_top(|ui| {
-                            ui.add_space(half_frame_width - 95.0);
-                            egui::ComboBox::from_label("Image Filter Type (not wired up)")
-                                .selected_text(format!("{image_filter:?}"))
-                                .show_ui(ui, |ui| {
-                                    ui.style_mut().wrap = Some(false);
-                                    ui.selectable_value(&mut self.image_filter, FilterType::Nearest, "Nearest Neighbor");
-                                    ui.selectable_value(&mut self.image_filter, FilterType::Triangle, "Linear Filter");
-                                    ui.selectable_value(&mut self.image_filter, FilterType::CatmullRom, "Cubic Filter");
-                                    ui.selectable_value(&mut self.image_filter, FilterType::Gaussian, "Gaussian Filter");
-                                    ui.selectable_value(&mut self.image_filter, FilterType::Lanczos3, "Lanczos with window 3");
-                                });
                         });
                         ui.separator();
                         if ui.add(Slider::new(&mut self.target_max_width, self.source_min_width..=self.source_max_width)
@@ -289,16 +269,6 @@ impl eframe::App for App {
         });
         self.update = false;
     }
-}
-
-fn build_background_texture(name: &str, optional_image: &Option<DynamicImage>, ui: &mut egui::Ui) -> Option<TextureHandle> {
-    optional_image.as_ref().map(|image| {
-        let size = [image.width() as _, image.height() as _];
-        let capacity = image.width() * image.height() * 4;
-        let pixels = vec![255u8; capacity as usize];
-        let color_image = ColorImage::from_rgba_unmultiplied(size, &pixels);
-        ui.ctx().load_texture(name, ImageData::Color(Arc::new(color_image)), TextureOptions::default())
-    })
 }
 
 fn build_image_texture(name: &str, optional_image: &Option<DynamicImage>, ui: &mut egui::Ui) -> Option<TextureHandle> {

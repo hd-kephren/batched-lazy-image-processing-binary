@@ -21,7 +21,7 @@ fn main() {
         let batch_size = args.batch_size;
         let input = args.input.as_str();
         println!(":::::Settings:::::\naspect ratio: {}\nextensions to process: {}\nbatch size: {}\ninput directory: {}\noutput directory: {}\nmax image width: {}\nJPEG quality: {}\n", args.aspect_ratio, args.extensions, args.batch_size, args.input, args.output, args.max_width, args.quality);
-        // rexiv2::initialize().expect("Unable to initialize 'rexiv2'. Please check the readme.md for external requirements.");
+        rexiv2::initialize().expect("Unable to initialize 'rexiv2'. Please check the readme.md for external requirements.");
 
         let extensions: Vec<&str> = args.extensions.split("|").collect();
         let filtered_files = directory_to_files(&input, &extensions);

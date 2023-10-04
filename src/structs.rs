@@ -14,7 +14,7 @@ pub struct Args {
     pub batch_size: usize,
 
     /// Picture formats by extension to process
-    #[arg(short, long, default_value = "gif|jpg|jpeg|png")]
+    #[arg(short, long, default_value = "jpg|jpeg|png")]
     pub extensions: String,
 
     /// Input directory for source images
