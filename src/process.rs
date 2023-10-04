@@ -5,12 +5,37 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use fraction::{Fraction, ToPrimitive};
-use image::DynamicImage;
 use image::codecs::jpeg::JpegEncoder;
+use image::DynamicImage;
 use image::imageops::FilterType;
+use rayon::prelude::*;
 use regex::Regex;
 
+use crate::imports::directory_to_files;
 use crate::structs::Args;
+
+use std::sync::atomic::Ordering;
+use atomic_float::AtomicF32;
+
+pub fn process_images<'t>(args: &Args, progress: &'t AtomicF32) {
+    let batch_size = args.batch_size;
+    let input = args.input.as_str();
+    let extensions: Vec<&str> = args.extensions.split("|").collect();
+    let filtered_files = directory_to_files(&input, &extensions);
+    let count = filtered_files.iter().count();
+    let steps = 1.0 / count as f32;
+
+    filtered_files
+        .chunks(batch_size)
+        .for_each(|filtered_files_of_files| {
+            filtered_files_of_files
+                .par_iter()
+                .for_each(|file| {
+                    progress.fetch_add(steps, Ordering::SeqCst);
+                    process_image(file, &args);
+                })
+        });
+}
 
 pub fn process_image(file: &std::io::Result<DirEntry>, args: &Args) {
     let path = file.as_ref().unwrap().path();
