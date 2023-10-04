@@ -2,6 +2,9 @@ use std::fs::DirEntry;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::thread;
+use std::time::Duration;
 use atomic_float::AtomicF32;
 
 use eframe::egui;
@@ -17,6 +20,8 @@ pub fn run(settings: Args) {
     let native_options = eframe::NativeOptions::default();
     let _ = eframe::run_native("Batched Lazy Image Processing Binary", native_options, Box::new(|cc| Box::new(App::new(cc, settings))));
 }
+
+static PROGRESS: AtomicF32 = AtomicF32::new(0.0);
 
 struct App {
     jpeg_quality: u32,
@@ -37,7 +42,6 @@ struct App {
     source_image: Option<DynamicImage>,
     source_texture: Option<TextureHandle>,
     target_texture: Option<TextureHandle>,
-    progress: AtomicF32,
     update: bool,
 }
 
@@ -47,6 +51,7 @@ impl App {
         // Restore app state using cc.storage (requires the "persistence" feature).
         // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
         // for e.g. egui::PaintCallback.
+
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let input_directory = settings.input.as_str();
         let extensions: Vec<&str> = settings.extensions.split("|").collect();
@@ -80,7 +85,6 @@ impl App {
             source_image: None,
             source_texture: None,
             target_texture: None,
-            progress: AtomicF32::from(0.0),
             update: true,
         }
     }
@@ -207,20 +211,33 @@ impl eframe::App for App {
                     });
                 ui.add_space(5.0);
                 ui.horizontal_top(|ui| {
-                    if ui.button("Process All Images").clicked() {
-                        let args = Args {
-                            aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
-                            batch_size: self.batch_size,
-                            extensions: self.extensions.clone(),
-                            input: self.input.clone(),
-                            max_width: self.target_max_width,
-                            output: self.output.clone(),
-                            quality: self.jpeg_quality as u8,
-                            ui: true,
-                        };
-                        process_images(&args, &self.progress);
+                    let button = egui::Button::new("Process Images");
+                    if PROGRESS.load(Ordering::SeqCst) == 0.0
+                        || PROGRESS.load(Ordering::SeqCst) == 1.0 {
+                        if ui.add(button).clicked() {
+                            let args = Args {
+                                aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
+                                batch_size: self.batch_size,
+                                extensions: self.extensions.clone(),
+                                input: self.input.clone(),
+                                max_width: self.target_max_width,
+                                output: self.output.clone(),
+                                quality: self.jpeg_quality as u8,
+                                ui: true,
+                            };
+                            PROGRESS.swap(0.0, Ordering::SeqCst);
+                            thread::spawn(move || {
+                                process_images(&args, &PROGRESS);
+                            });
+                        }
+                    } else {
+                        ui.add_enabled(false, button);
                     }
-                    ui.add(egui::ProgressBar::new(*self.progress.get_mut()).show_percentage());
+
+                    ui.add(egui::ProgressBar::new(PROGRESS.load(Ordering::SeqCst)).show_percentage());
+                    if PROGRESS.load(Ordering::SeqCst) < 1.0 && PROGRESS.load(Ordering::SeqCst) > 0.0 {
+                        ctx.request_repaint_after(Duration::from_secs(1));
+                    }
                 });
                 ui.separator();
                 ui.columns(2, |cols| {

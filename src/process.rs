@@ -17,7 +17,7 @@ use crate::structs::Args;
 use std::sync::atomic::Ordering;
 use atomic_float::AtomicF32;
 
-pub fn process_images<'t>(args: &Args, progress: &'t AtomicF32) {
+pub fn process_images(args: &Args, progress: &'static AtomicF32) {
     let batch_size = args.batch_size;
     let input = args.input.as_str();
     let extensions: Vec<&str> = args.extensions.split("|").collect();
@@ -31,10 +31,12 @@ pub fn process_images<'t>(args: &Args, progress: &'t AtomicF32) {
             filtered_files_of_files
                 .par_iter()
                 .for_each(|file| {
-                    progress.fetch_add(steps, Ordering::SeqCst);
+                    let x = progress.load(Ordering::SeqCst);
+                    progress.swap(x + steps, Ordering::SeqCst);
                     process_image(file, &args);
                 })
         });
+    progress.swap(1.0, Ordering::SeqCst);
 }
 
 pub fn process_image(file: &std::io::Result<DirEntry>, args: &Args) {
