@@ -25,18 +25,6 @@ pub struct Args {
     #[arg(short, long, default_value = "1500")]
     pub max_width: u32,
 
-    /// Do not crop the image
-    #[arg(long)]
-    pub no_crop: bool,
-
-    /// Do not copy EXIF/XMP/IPTC Metadata
-    #[arg(long)]
-    pub no_metadata: bool,
-
-    /// Do not resize the image
-    #[arg(long)]
-    pub no_resize: bool,
-
     /// Output directory for processed images
     #[arg(short, long, default_value = "./output/")]
     pub output: String,

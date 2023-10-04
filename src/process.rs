@@ -2,6 +2,7 @@ use std::ffi::OsStr;
 use std::fs::{DirEntry, File};
 use std::io::BufWriter;
 use std::io::Write;
+use std::ops::Deref;
 use std::path::PathBuf;
 
 use fraction::{Fraction, ToPrimitive};
@@ -26,20 +27,20 @@ pub fn process_image_from_path(path: PathBuf, args: Args) {
     let _result = match file_extension {
         None => (),
         Some("jpg" | "jpeg") => process_jpg(path, args),
-        Some("gif" | "png") => process_gif_png(path, args),
+        Some("gif" | "png") => process_gif_png(&path, args),
         Some(ext) => {
             println!("{} | Image format '{}' not supported.", file_name, ext)
         }
     };
 }
-pub fn process_in_memory_image(image: Option<DynamicImage>, args: Args) -> Vec<u8> {
+
+pub fn process_in_memory_image(image: &Option<DynamicImage>, args: Args) -> Vec<u8> {
     match image {
         Some(img) => {
             let re_jpg = Regex::new(r"\.jpeg$").unwrap();
-            // let new_file_path = re_jpg.replace_all(file_path.as_str(), ".jpg").to_string(); //file_path.replace(".jpeg", ".jpg");
             let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
-            let img = if !args.no_crop { crop_jpg_png(img, current_aspect, args.aspect_ratio) } else { img };
-            let img = if !args.no_crop { resize_jpg_png(img, args.max_width) } else { img };
+            let img = &crop_jpg_png(img, current_aspect, args.aspect_ratio);
+            let img = &resize_jpg_png(img, args.max_width);
             let inner = Vec::new();
             let mut buff = BufWriter::new(inner);
             let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
@@ -59,7 +60,7 @@ pub fn load_image_from_vec(vec: &Vec<u8>) -> Option<DynamicImage> {
             println!("error [processing_image] {}", error);
             None
         }
-    }
+    };
 }
 
 
@@ -69,33 +70,32 @@ fn process_jpg(path: PathBuf, args: Args) {
     let re_jpg = Regex::new(r"\.jpeg$").unwrap();
     let img = image::open(path.clone());
     if img.is_ok() {
-        let img = img.unwrap();
+        let img = &img.unwrap();
         let new_file_path = re_jpg.replace_all(file_path.as_str(), ".jpg").to_string(); //file_path.replace(".jpeg", ".jpg");
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
-        let img = if !args.no_crop { crop_jpg_png(img, current_aspect, args.aspect_ratio) } else { img };
-        let img = if !args.no_crop { resize_jpg_png(img, args.max_width) } else { img };
+        let img = crop_jpg_png(&img, current_aspect, args.aspect_ratio);
+        let img = resize_jpg_png(&img, args.max_width);
         let buff = File::create(new_file_path.clone()).unwrap();
         let mut buff = BufWriter::new(buff);
         let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
         let _result = img.write_with_encoder(encoder).unwrap();
         let _result = buff.flush().unwrap();
-        if !args.no_metadata { copy_metadata(path.to_str().unwrap(), new_file_path.as_str()) };
+        copy_metadata(path.to_str().unwrap(), new_file_path.as_str())
     }
 }
 
 
-
-fn process_gif_png(path: PathBuf, args: Args) {
+fn process_gif_png(path: &PathBuf, args: Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let new_file_path = format!("{}{}", args.output, file_name);
-    let img = image::open(path.clone());
+    let img = image::open(path);
     if img.is_ok() {
-        let img = img.unwrap();
+        let img = &img.unwrap();
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
-        let img = if !args.no_crop { crop_jpg_png(img, current_aspect, args.aspect_ratio) } else { img };
-        let img = if !args.no_crop { resize_jpg_png(img, args.max_width) } else { img };
+        let img = &crop_jpg_png(&img, current_aspect, args.aspect_ratio);
+        let img = &resize_jpg_png(&img, args.max_width);
         let _result = img.save(new_file_path.clone());
-        if !args.no_metadata { copy_metadata(path.to_str().unwrap(), new_file_path.as_str()) };
+        copy_metadata(path.to_str().unwrap(), new_file_path.as_str());
     }
 }
 
@@ -116,10 +116,10 @@ fn process_animated_gif(path: PathBuf, args: Args) {
             encoder.write_frame(&frame).unwrap();
         }
     }
-    if !args.no_metadata { copy_metadata(path.to_str().unwrap(), new_file_path.as_str()) };
+    copy_metadata(path.to_str().unwrap(), new_file_path.as_str())
 }
 
-pub fn resize_jpg_png(img: DynamicImage, max_width: u32) -> DynamicImage {
+pub fn resize_jpg_png(img: &DynamicImage, max_width: u32) -> DynamicImage {
     let max_width = max_width as f64;
     let current_width = img.width() as f64;
     let current_height = img.height() as f64;
@@ -129,15 +129,14 @@ pub fn resize_jpg_png(img: DynamicImage, max_width: u32) -> DynamicImage {
     let new_width = if current_width > max_width { max_width } else { current_width } as u32;
     let new_height = if current_width > max_width { (max_width / current_width) * current_height } else { current_height } as u32;
 
-    let img = if resize {
-        return img.resize_exact(new_width, new_height, FilterType::CatmullRom);
+    if resize {
+        img.resize_exact(new_width, new_height, FilterType::CatmullRom)
     } else {
-        img
-    };
-    return img;
+        img.clone()
+    }
 }
 
-pub fn crop_jpg_png(img: DynamicImage, current_aspect: Fraction, new_aspect: Fraction) -> DynamicImage {
+pub fn crop_jpg_png(img: &DynamicImage, current_aspect: Fraction, new_aspect: Fraction) -> DynamicImage {
     if new_aspect < current_aspect { // too wide
         // anchor on height, center on width
         let current_height = img.height();
@@ -153,7 +152,7 @@ pub fn crop_jpg_png(img: DynamicImage, current_aspect: Fraction, new_aspect: Fra
         let y = ((current_height - new_height) as f64 / 2.0) as u32;
         img.crop_imm(0, y, current_width, new_height)
     } else { // just right, noop
-        img
+        img.clone()
     }
 }
 
