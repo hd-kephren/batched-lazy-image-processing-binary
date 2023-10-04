@@ -1,17 +1,17 @@
 use std::ffi::OsStr;
 use std::fs::{DirEntry, File};
 use std::io::BufWriter;
+use std::io::Write;
 use std::path::PathBuf;
+
 use fraction::{Fraction, ToPrimitive};
 use gif::Encoder;
+use image::DynamicImage;
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, ImageBuffer};
 use image::imageops::FilterType;
 use regex::Regex;
-use std::io::Write;
-use std::mem::size_of;
-use crate::structs::Args;
 
+use crate::structs::Args;
 
 pub fn process_image(file: &std::io::Result<DirEntry>, args: Args) {
     let args = args.clone();

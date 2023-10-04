@@ -1,5 +1,4 @@
 use std::fs::DirEntry;
-use std::mem::size_of;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -37,7 +36,6 @@ struct App {
     file_selected: usize,
     source_file_name: Option<String>,
     source_path: Option<PathBuf>,
-    target_file_path: Option<String>,
     source_image: Option<DynamicImage>,
     source_texture: Option<TextureHandle>,
     target_image: Option<DynamicImage>,
@@ -83,7 +81,6 @@ impl App {
             file_selected: 1,
             source_path,
             source_file_name,
-            target_file_path: None,
             source_image: None,
             source_texture: None,
             target_image: None,
@@ -98,7 +95,7 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let frame_size = frame.info().window_info.size;
-            let half_frame_width = (frame_size.x / 2.0);
+            let half_frame_width = frame_size.x / 2.0;
             let checkbox_spacing = half_frame_width - 10.0;
             let slider_spacing = half_frame_width - 43.0;
             ui.style_mut().spacing.slider_width = slider_spacing;
@@ -126,12 +123,13 @@ impl eframe::App for App {
                                     self.files = directory_to_files(path.display().to_string().as_str(), &extensions);
                                     self.file_count = self.files.iter().count();
                                     self.file_selected = 1;
-                                    let file = self.files.get(self.file_selected-1).unwrap();
+                                    let file = self.files.get(self.file_selected - 1).unwrap();
                                     let path = file.as_ref().map(|f| { f.path() }).unwrap();
                                     let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
                                     self.source_file_name = file_name;
                                     self.source_path = Some(path);
-                                    self.update = true;
+                                    self.preview = false;
+                                    self.update=true;
                                 }
                             }
                         });
@@ -149,6 +147,7 @@ impl eframe::App for App {
                                     .pick_folder() {
                                     self.output = path.display().to_string();
                                 }
+                                self.update = true;
                             }
                         });
                         ui.separator();
@@ -220,7 +219,7 @@ impl eframe::App for App {
                         .orientation(SliderOrientation::Horizontal)
                         .text(format!(" of {} Files", self.file_count));
                     if ui.add(slider).changed() {
-                        let file = self.files.get(self.file_selected-1).unwrap();
+                        let file = self.files.get(self.file_selected - 1).unwrap();
                         let path = file.as_ref().map(|f| { f.path() }).unwrap();
                         let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
                         self.source_file_name = file_name;
@@ -228,18 +227,20 @@ impl eframe::App for App {
                         if self.source_file_name.is_some() && self.source_path.is_some() {
                             self.source_image = match image::open(self.source_path.clone().unwrap()) {
                                 Ok(image) => Some(image),
-                                Err(error) => None
+                                Err(_) => None
                             };
                         };
                         self.update = true;
                     };
                     ui.vertical_centered_justified(|ui| {
-                        ui.checkbox(&mut self.preview, "Live Preview");
+                        if ui.checkbox(&mut self.preview, "Live Preview").changed() {
+                            self.update = true;
+                        };
                     });
                     ui.add_space(2.0);
                 });
                 ui.columns(2, |cols| {
-                    if self.preview {
+                    if self.preview && self.update {
                         let args = Args {
                             aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
                             batch_size: self.batch_size.clone(),
@@ -253,7 +254,7 @@ impl eframe::App for App {
                             quality: self.jpeg_quality as u8,
                             ui: true,
                         };
-                        if self.source_image.is_some() && self.update {
+                        if self.source_image.is_some() {
                             let buffer = process_in_memory_image(self.source_image.clone(), args.clone());
                             // println!("buff_len: {}, size_of::<Vec<u8>>: {}, size_of::<u8>: {}", buffer.len(), size_of::<Vec<u8>>(), size_of::<u8>());
                             self.target_image = load_image_from_vec(&buffer);
@@ -265,13 +266,13 @@ impl eframe::App for App {
                                 if self.source_file_name.is_some() && self.source_path.is_some() {
                                     self.source_image = match image::open(self.source_path.clone().unwrap()) {
                                         Ok(image) => Some(image),
-                                        Err(error) => None
+                                        Err(_) => None
                                     };
-                                    let size_in_bytes = self.source_image.as_ref().map(|img| { img.as_bytes().iter().count() });
+                                    // let size_in_bytes = self.source_image.as_ref().map(|img| { img.as_bytes().iter().count() });
                                     col.label(format!("Source Image: {}", self.source_file_name.clone().unwrap()));
                                     // col.label(format!("Size {} bytes", size_in_bytes.unwrap() * size_of::<u8>()));
                                     if self.update {
-                                       self.source_texture = render_dynamic_image("source", self.source_image.clone(), col);
+                                        self.source_texture = render_dynamic_image("source", self.source_image.clone(), col);
                                     };
 
                                     match &self.source_texture {
@@ -291,17 +292,19 @@ impl eframe::App for App {
                         } else {
                             col.vertical_centered_justified(|col| {
                                 if self.preview && self.target_image.is_some() {
-                                    let size_in_bytes = self.target_image.as_ref().map(|img| { img.as_bytes().iter().count() });
+                                    // let size_in_bytes = self.target_image.as_ref().map(|img| { img.as_bytes().iter().count() });
                                     col.label(format!("Target Image: {}", self.source_file_name.clone().unwrap()));
                                     // col.label(format!("size {} ", (size_in_bytes.unwrap() as f64)/(size_of::<u8>() as f64)));
                                     if self.update {
-                                     self.target_texture = render_dynamic_image("preview", self.target_image.clone(), col);
+                                        self.target_texture = render_dynamic_image("preview", self.target_image.clone(), col);
+
                                     }
                                     match &self.target_texture {
                                         Some(handle) => {
                                             col.vertical_centered_justified(|col| {
                                                 egui::ScrollArea::both().show(col, |col| {
                                                     col.image((handle.id(), handle.size_vec2()));
+
                                                 });
                                             });
                                         }
@@ -342,7 +345,7 @@ fn render_dynamic_image(name: &str, optional_image: Option<DynamicImage>, ui: &m
                 Ok(color_image) => {
                     let arc_color_image = Arc::new(color_image);
                     let handle = ui.ctx().load_texture(
-                        "preview",
+                        name,
                         ImageData::Color(
                             arc_color_image
                         ),

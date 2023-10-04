@@ -1,7 +1,6 @@
 use clap::Parser;
 use indicatif::ProgressBar;
 use rayon::prelude::*;
-use regex::Regex;
 
 use crate::imports::directory_to_files;
 use crate::process::process_image;

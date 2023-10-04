@@ -1,7 +1,6 @@
 use std::fs;
 use std::fs::DirEntry;
 use std::io::Result;
-use crate::structs::LoadedImage;
 
 pub fn directory_to_files(path: &str, extensions: &Vec<&str>) -> Vec<Result<DirEntry>> {
     let paths = fs::read_dir(path).unwrap();

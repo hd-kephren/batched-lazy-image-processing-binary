@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use clap::Parser;
 use fraction::Fraction;
-use image::DynamicImage;
 
 #[derive(Parser, Debug, Clone, Default)]
 #[command(author, version, about, long_about = None)]
