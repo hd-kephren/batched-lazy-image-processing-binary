@@ -158,8 +158,8 @@ pub fn crop_jpg_png(img: DynamicImage, current_aspect: Fraction, new_aspect: Fra
 }
 
 pub fn copy_metadata(source_path: &str, target_path: &str) {
-    let meta = rexiv2::Metadata::new_from_path(source_path).unwrap();
-    meta.clear_tag("Exif.Image.ImageLength");
-    meta.clear_tag("Exif.Image.ImageWidth");
-    let _result = meta.save_to_file(target_path);
+    // let meta = rexiv2::Metadata::new_from_path(source_path).unwrap();
+    // meta.clear_tag("Exif.Image.ImageLength");
+    // meta.clear_tag("Exif.Image.ImageWidth");
+    // let _result = meta.save_to_file(target_path);
 }
