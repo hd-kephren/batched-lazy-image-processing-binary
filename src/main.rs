@@ -37,7 +37,7 @@ fn main() {
                     .par_iter()
                     .for_each(|file| {
                         progress_bar.inc(1);
-                        process_image(file, args.clone());
+                        process_image(file, &args);
                     })
             });
         progress_bar.finish();

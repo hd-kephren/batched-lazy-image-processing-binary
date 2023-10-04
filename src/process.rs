@@ -12,14 +12,12 @@ use regex::Regex;
 
 use crate::structs::Args;
 
-pub fn process_image(file: &std::io::Result<DirEntry>, args: Args) {
-    let args = args.clone();
+pub fn process_image(file: &std::io::Result<DirEntry>, args: &Args) {
     let path = file.as_ref().unwrap().path();
     process_image_from_path(path, args);
 }
 
-pub fn process_image_from_path(path: PathBuf, args: Args) {
-    let args = args.clone();
+pub fn process_image_from_path(path: PathBuf, args: &Args) {
     let file_extension = path.extension().and_then(OsStr::to_str);
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let _result = match file_extension {
@@ -32,7 +30,7 @@ pub fn process_image_from_path(path: PathBuf, args: Args) {
     };
 }
 
-pub fn process_in_memory_image(image: &Option<DynamicImage>, args: Args) -> Vec<u8> {
+pub fn process_in_memory_image(image: &Option<DynamicImage>, args: &Args) -> Vec<u8> {
     match image {
         Some(img) => {
             let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
@@ -61,18 +59,18 @@ pub fn load_image_from_vec(vec: &Vec<u8>) -> Option<DynamicImage> {
 }
 
 
-fn process_jpg(path: PathBuf, args: Args) {
+fn process_jpg(path: PathBuf, args: &Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let file_path = format!("{}{}", args.output, file_name);
     let re_jpg = Regex::new(r"\.jpeg$").unwrap();
-    let img = image::open(path.clone());
+    let img = image::open(&path);
     if img.is_ok() {
         let img = &img.unwrap();
         let new_file_path = re_jpg.replace_all(file_path.as_str(), ".jpg").to_string(); //file_path.replace(".jpeg", ".jpg");
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
         let img = crop_image(&img, current_aspect, args.aspect_ratio);
         let img = resize_image(&img, args.max_width);
-        let buff = File::create(new_file_path.clone()).unwrap();
+        let buff = File::create(&new_file_path).unwrap();
         let mut buff = BufWriter::new(buff);
         let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
         let _result = img.write_with_encoder(encoder).unwrap();
@@ -82,7 +80,7 @@ fn process_jpg(path: PathBuf, args: Args) {
 }
 
 
-fn process_png(path: &PathBuf, args: Args) {
+fn process_png(path: &PathBuf, args: &Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let new_file_path = format!("{}{}", args.output, file_name);
     let img = image::open(path);
@@ -91,7 +89,7 @@ fn process_png(path: &PathBuf, args: Args) {
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
         let img = &crop_image(&img, current_aspect, args.aspect_ratio);
         let img = &resize_image(&img, args.max_width);
-        let _result = img.save(new_file_path.clone());
+        let _result = img.save(&new_file_path);
         copy_metadata(path.to_str().unwrap(), new_file_path.as_str());
     }
 }

@@ -110,7 +110,7 @@ impl eframe::App for App {
                             ui.add_sized(size, text);
                             if ui.button("Input folder...").clicked() {
                                 if let Some(path) = rfd::FileDialog::new()
-                                    .set_directory(self.input.clone())
+                                    .set_directory(&self.input)
                                     .pick_folder() {
                                     let extensions = self.extensions.split("|").collect();
                                     self.input = path.display().to_string();
@@ -137,7 +137,7 @@ impl eframe::App for App {
                             ui.add_sized(size, text);
                             if ui.button("Output folder...").clicked() {
                                 if let Some(path) = rfd::FileDialog::new()
-                                    .set_directory(self.output.clone())
+                                    .set_directory(&self.output)
                                     .pick_folder() {
                                     self.output = path.display().to_string();
                                 }
@@ -187,10 +187,12 @@ impl eframe::App for App {
                                 self.source_file_name = file_name;
                                 self.source_path = Some(path);
                                 if self.source_file_name.is_some() && self.source_path.is_some() {
-                                    self.source_image = match image::open(self.source_path.clone().unwrap()) {
-                                        Ok(image) => Some(image),
-                                        Err(_) => None
-                                    };
+                                    self.source_path.iter().for_each(|path|{
+                                        self.source_image = match image::open(path) {
+                                            Ok(image) => Some(image),
+                                            Err(_) => None
+                                        };
+                                    });
                                 };
                                 self.update = true;
                             };
@@ -236,7 +238,7 @@ impl eframe::App for App {
                             if self.preview && self.update {
                                 let args = Args {
                                     aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
-                                    batch_size: self.batch_size.clone(),
+                                    batch_size: self.batch_size,
                                     extensions: self.extensions.clone(),
                                     input: self.input.clone(),
                                     max_width: self.target_max_width,
@@ -245,21 +247,19 @@ impl eframe::App for App {
                                     ui: true,
                                 };
                                 if self.source_image.is_some()  {
-                                    let buffer = process_in_memory_image(&self.source_image, args.clone());
+                                    let buffer = process_in_memory_image(&self.source_image, &args);
                                     self.target_image = load_image_from_vec(&buffer);
                                     self.target_texture = build_image_texture("target", &self.target_image, col);
                                 };
                             }
                             col.vertical_centered_justified(|col| {
+                                col.label(format!("Target Image: {}", self.source_file_name.as_ref().unwrap_or(&String::from("<None>"))));
                                 if self.preview && self.target_image.is_some() {
-                                    col.label(format!("Target Image: {}", self.source_file_name.clone().unwrap()));
                                     self.target_texture.as_ref().map(|target_handle| {
-                                            egui::ScrollArea::both().show(col, |col| {
-                                                col.image((target_handle.id(), target_handle.size_vec2()));
-                                            });
+                                        egui::ScrollArea::both().show(col, |col| {
+                                            col.image((target_handle.id(), target_handle.size_vec2()));
+                                        });
                                     });
-                                } else {
-                                    col.label("Target Image: <None>");
                                 }
                             });
                         }
