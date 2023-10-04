@@ -2,7 +2,6 @@ use std::ffi::OsStr;
 use std::fs::{DirEntry, File};
 use std::io::BufWriter;
 use std::io::Write;
-use std::ops::Deref;
 use std::path::PathBuf;
 
 use fraction::{Fraction, ToPrimitive};

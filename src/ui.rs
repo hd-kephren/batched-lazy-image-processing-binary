@@ -84,7 +84,6 @@ impl App {
             source_texture: None,
             target_image: None,
             target_texture: None,
-            background_texture: None,
             update: true,
         };
         this
@@ -267,7 +266,6 @@ impl eframe::App for App {
                                 };
                                 if self.source_image.is_some()  {
                                     let buffer = process_in_memory_image(&self.source_image, args.clone());
-                                    // println!("buff_len: {}, size_of::<Vec<u8>>: {}, size_of::<u8>: {}", buffer.len(), size_of::<Vec<u8>>(), size_of::<u8>());
                                     self.target_image = load_image_from_vec(&buffer);
                                     self.target_texture = build_image_texture("target", &self.target_image, col);
                                 };
@@ -278,7 +276,6 @@ impl eframe::App for App {
                                     self.target_texture.as_ref().map(|target_handle| {
                                             egui::ScrollArea::both().show(col, |col| {
                                                 col.image((target_handle.id(), target_handle.size_vec2()));
-                                                // col.image((background_handle.id(), background_handle.size_vec2()));
                                             });
                                     });
                                 } else {
