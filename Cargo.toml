@@ -1,6 +1,6 @@
 [package]
 name = "batched-lazy-image-processing-binary"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Kephren Newton <kephren.newton@harley-davidson.com>"]
 edition = "2021"
 description = "A batch image processor for cropping, reformatting, and resizing multiple images."

@@ -30,7 +30,7 @@ pub struct Args {
     pub output: String,
 
     /// JPEG quality
-    #[arg(short, long, default_value = "95")]
+    #[arg(short, long, default_value = "90")]
     pub quality: u8,
 
     /// Initialize with UI (still under major development)

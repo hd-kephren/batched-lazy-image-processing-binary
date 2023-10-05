@@ -22,7 +22,7 @@ Options:
   -i, --input <INPUT>                Input directory for source images [default: ./input/]
   -m, --max-width <MAX_WIDTH>        Max width of image allowed before resizing [default: 1500]
   -o, --output <OUTPUT>              Output directory for processed images [default: ./output/]
-  -q, --quality <QUALITY>            JPEG quality [default: 95]
+  -q, --quality <QUALITY>            JPEG quality [default: 90]
       --ui                           Initialize with UI (still under major development)
   -h, --help                         Print help
   -V, --version                      Print version
