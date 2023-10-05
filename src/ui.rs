@@ -7,7 +7,7 @@ use std::thread;
 use std::time::Duration;
 use atomic_float::AtomicF32;
 
-use eframe::egui;
+use eframe::{egui, Renderer};
 use eframe::egui::{Align, ColorImage, ImageData, Slider, SliderOrientation, TextureHandle, TextureOptions};
 use fraction::Fraction;
 use image::{DynamicImage, EncodableLayout};
@@ -17,7 +17,10 @@ use crate::process::{load_image_from_vec, process_images, process_in_memory_imag
 use crate::structs::Args;
 
 pub fn run(settings: Args) {
-    let native_options = eframe::NativeOptions::default();
+    let native_options = eframe::NativeOptions {
+        renderer: Renderer::Wgpu,
+        ..Default::default()
+    };
     let _ = eframe::run_native("Batched Lazy Image Processing Binary", native_options, Box::new(|cc| Box::new(App::new(cc, settings))));
 }
 
