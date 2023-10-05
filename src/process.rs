@@ -7,7 +7,6 @@ use std::path::PathBuf;
 use fraction::{Fraction, ToPrimitive};
 use image::codecs::jpeg::JpegEncoder;
 use image::DynamicImage;
-use image::imageops::FilterType;
 use rayon::prelude::*;
 use regex::Regex;
 
@@ -16,6 +15,7 @@ use crate::structs::Args;
 
 use std::sync::atomic::Ordering;
 use atomic_float::AtomicF32;
+use image::codecs::png::PngEncoder;
 
 pub fn process_images(args: &Args, progress: &'static AtomicF32) {
     let batch_size = args.batch_size;
@@ -41,16 +41,16 @@ pub fn process_images(args: &Args, progress: &'static AtomicF32) {
 
 pub fn process_image(file: &std::io::Result<DirEntry>, args: &Args) {
     let path = file.as_ref().unwrap().path();
-    process_image_from_path(path, args);
+    process_image_from_path(&path, args);
 }
 
-pub fn process_image_from_path(path: PathBuf, args: &Args) {
+pub fn process_image_from_path(path: &PathBuf, args: &Args) {
     let file_extension = path.extension().and_then(OsStr::to_str);
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let _result = match file_extension {
         None => (),
         Some("jpg" | "jpeg") => process_jpg(path, args),
-        Some("png") => process_png(&path, args),
+        Some("png") => process_png(path, args),
         Some(ext) => {
             println!("{} | Image format '{}' not supported.", file_name, ext)
         }
@@ -86,7 +86,7 @@ pub fn load_image_from_vec(vec: &Vec<u8>) -> Option<DynamicImage> {
 }
 
 
-fn process_jpg(path: PathBuf, args: &Args) {
+fn process_jpg(path: &PathBuf, args: &Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let file_path = format!("{}{}", args.output, file_name);
     let re_jpg = Regex::new(r"\.jpeg$").unwrap();
@@ -114,10 +114,14 @@ fn process_png(path: &PathBuf, args: &Args) {
     if img.is_ok() {
         let img = &img.unwrap();
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
-        let img = &crop_image(&img, current_aspect, args.aspect_ratio);
-        let img = &resize_image(&img, args.max_width);
-        let _result = img.save(&new_file_path);
-        copy_metadata(path.to_str().unwrap(), new_file_path.as_str());
+        let img = crop_image(&img, current_aspect, args.aspect_ratio);
+        let img = resize_image(&img, args.max_width);
+        let buff = File::create(&new_file_path).unwrap();
+        let mut buff = BufWriter::new(buff);
+        let encoder = PngEncoder::new_with_quality(&mut buff, image::codecs::png::CompressionType::Best, image::codecs::png::FilterType::Adaptive);
+        let _result = img.write_with_encoder(encoder).unwrap();
+        let _result = buff.flush().unwrap();
+        copy_metadata(path.to_str().unwrap(), new_file_path.as_str())
     }
 }
 
@@ -129,7 +133,7 @@ pub fn resize_image(img: &DynamicImage, max_width: u32) -> DynamicImage {
     let new_width = if current_width > max_width { max_width } else { current_width } as u32;
     let new_height = if current_width > max_width { (max_width / current_width) * current_height } else { current_height } as u32;
 
-    img.resize_exact(new_width, new_height, FilterType::CatmullRom)
+    img.resize_exact(new_width, new_height, image::imageops::FilterType::CatmullRom)
 }
 
 pub fn crop_image(img: &DynamicImage, current_aspect: Fraction, new_aspect: Fraction) -> DynamicImage {
