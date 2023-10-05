@@ -13,9 +13,13 @@ pub struct Args {
     #[arg(short, long, default_value = "100")]
     pub batch_size: usize,
 
-    /// Picture formats by extension to process
+    /// Picture formats to read
     #[arg(short, long, default_value = "jpg|jpeg|png")]
-    pub extensions: String,
+    pub decode: String,
+
+    /// Picture formats to write (options; original, jpg, or png
+    #[arg(short, long, default_value = "original")]
+    pub encode: String,
 
     /// Input directory for source images
     #[arg(short, long, default_value = "./input/")]

@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs::DirEntry;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -13,7 +14,7 @@ use fraction::Fraction;
 use image::{DynamicImage, EncodableLayout};
 
 use crate::imports::directory_to_files;
-use crate::process::{load_image_from_vec, process_images, process_in_memory_image};
+use crate::process::{load_image_from_vec, process_images, process_image_in_memory};
 use crate::structs::Args;
 
 pub fn run(settings: Args) {
@@ -33,7 +34,8 @@ struct App {
     source_min_width: u32,
     aspect_ratio: String,
     batch_size: usize,
-    extensions: String,
+    decode: String,
+    encode: String,
     preview: bool,
     input: String,
     output: String,
@@ -41,6 +43,7 @@ struct App {
     file_count: usize,
     file_selected: usize,
     source_file_name: Option<String>,
+    existing_extension: String,
     source_path: Option<PathBuf>,
     source_image: Option<DynamicImage>,
     source_texture: Option<TextureHandle>,
@@ -57,12 +60,15 @@ impl App {
 
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let input_directory = settings.input.as_str();
-        let extensions: Vec<&str> = settings.extensions.split("|").collect();
+        let extensions: Vec<&str> = settings.decode.split("|").collect();
         let files = directory_to_files(input_directory, &extensions);
         let file_count = files.iter().count();
+        let mut existing_extension = String::from("");
         let file_name_and_path = if files.iter().count() > 0 {
             let file = files.get(0).unwrap();
             let path = file.as_ref().map(|f| { f.path() }).unwrap();
+            let e = path.extension();
+            existing_extension = String::from(e.and_then(OsStr::to_str).unwrap());
             let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
             (file_name, Some(path))
         } else {
@@ -76,7 +82,9 @@ impl App {
             source_min_width: 0u32,
             aspect_ratio: settings.aspect_ratio.to_string(),
             batch_size: settings.batch_size,
-            extensions: settings.extensions,
+            decode: settings.decode.clone(),
+            encode: settings.encode.clone(),
+            existing_extension,
             preview: false,
             input: settings.input.clone(),
             output: settings.output,
@@ -119,18 +127,21 @@ impl eframe::App for App {
                                 if let Some(path) = rfd::FileDialog::new()
                                     .set_directory(&self.input)
                                     .pick_folder() {
-                                    let extensions = self.extensions.split("|").collect();
+                                    let extensions = self.decode.split("|").collect();
                                     self.input = path.display().to_string();
                                     self.files = directory_to_files(path.display().to_string().as_str(), &extensions);
                                     self.file_count = self.files.iter().count();
                                     self.file_selected = 1;
                                     let file = self.files.get(self.file_selected - 1).unwrap();
                                     let path = file.as_ref().map(|f| { f.path() }).unwrap();
+                                    let e = path.extension();
+                                    let existing_extension = String::from(e.and_then(OsStr::to_str).unwrap());
                                     let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
                                     self.source_file_name = file_name;
                                     self.source_path = Some(path);
                                     self.preview = false;
                                     self.update = true;
+                                    self.existing_extension = existing_extension;
                                 }
                             }
                         });
@@ -221,7 +232,8 @@ impl eframe::App for App {
                             let args = Args {
                                 aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
                                 batch_size: self.batch_size,
-                                extensions: self.extensions.clone(),
+                                decode: self.decode.clone(),
+                                encode: self.encode.clone(),
                                 input: self.input.clone(),
                                 max_width: self.target_max_width,
                                 output: self.output.clone(),
@@ -281,7 +293,8 @@ impl eframe::App for App {
                                 let args = Args {
                                     aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
                                     batch_size: self.batch_size,
-                                    extensions: self.extensions.clone(),
+                                    decode: self.decode.clone(),
+                                    encode: self.encode.clone(),
                                     input: self.input.clone(),
                                     max_width: self.target_max_width,
                                     output: self.output.clone(),
@@ -289,7 +302,7 @@ impl eframe::App for App {
                                     ui: true,
                                 };
                                 if self.source_image.is_some() {
-                                    let buffer = process_in_memory_image(&self.source_image, &args);
+                                    let buffer = process_image_in_memory(&self.source_image, &args, self.existing_extension.as_str());
                                     let target_image = &load_image_from_vec(&buffer);
                                     self.target_texture = build_image_texture("target", target_image, col);
                                 };

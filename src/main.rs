@@ -20,9 +20,9 @@ fn main() {
     } else {
         let batch_size = args.batch_size;
         let input = args.input.as_str();
-        println!(":::::Settings:::::\naspect ratio: {}\nextensions to process: {}\nbatch size: {}\ninput directory: {}\noutput directory: {}\nmax image width: {}\nJPEG quality: {}\n", args.aspect_ratio, args.extensions, args.batch_size, args.input, args.output, args.max_width, args.quality);
+        println!(":::::Settings:::::\naspect ratio: {}\nimage type to decode: {}\nbatch size: {}\ninput directory: {}\noutput directory: {}\nmax image width: {}\nJPEG quality: {}\n", args.aspect_ratio, args.decode, args.batch_size, args.input, args.output, args.max_width, args.quality);
 
-        let extensions: Vec<&str> = args.extensions.split("|").collect();
+        let extensions: Vec<&str> = args.decode.split("|").collect();
         let filtered_files = directory_to_files(&input, &extensions);
         let count = filtered_files.iter().count();
         let chunks = (count as f64 / batch_size as f64).ceil();

@@ -5,7 +5,6 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use fraction::{Fraction, ToPrimitive};
-use image::codecs::jpeg::JpegEncoder;
 use image::DynamicImage;
 use rayon::prelude::*;
 use regex::Regex;
@@ -15,12 +14,13 @@ use crate::structs::Args;
 
 use std::sync::atomic::Ordering;
 use atomic_float::AtomicF32;
+use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
 
 pub fn process_images(args: &Args, progress: &'static AtomicF32) {
     let batch_size = args.batch_size;
     let input = args.input.as_str();
-    let extensions: Vec<&str> = args.extensions.split("|").collect();
+    let extensions: Vec<&str> = args.decode.split("|").collect();
     let filtered_files = directory_to_files(&input, &extensions);
     let count = filtered_files.iter().count();
     let steps = 1.0 / count as f32;
@@ -49,25 +49,24 @@ pub fn process_image_from_path(path: &PathBuf, args: &Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let _result = match file_extension {
         None => (),
-        Some("jpg" | "jpeg") => process_jpg(path, args),
-        Some("png") => process_png(path, args),
+        Some("jpg" | "jpeg" | "png") => process_image_to_disk(path, args, file_extension.unwrap()),
         Some(ext) => {
             println!("{} | Image format '{}' not supported.", file_name, ext)
         }
     };
 }
 
-pub fn process_in_memory_image(image: &Option<DynamicImage>, args: &Args) -> Vec<u8> {
+pub fn process_image_in_memory(image: &Option<DynamicImage>, args: &Args, existing_extension: &str) -> Vec<u8> {
     match image {
         Some(img) => {
             let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
             let img = &crop_image(img, current_aspect, args.aspect_ratio);
             let img = &resize_image(img, args.max_width);
             let inner = Vec::new();
-            let mut buff = BufWriter::new(inner);
-            let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
-            let _result = img.write_with_encoder(encoder).unwrap();
-            let _result = buff.flush().unwrap();
+            let encode = args.encode.to_lowercase();
+            let encode = encode.as_str();
+            let new_extension = if encode == "original" { existing_extension } else { encode };
+            let buff = extension_to_encoder(inner, img, new_extension, args.quality);
             let slice = buff.into_inner().unwrap();
             slice
         }
@@ -86,41 +85,22 @@ pub fn load_image_from_vec(vec: &Vec<u8>) -> Option<DynamicImage> {
 }
 
 
-fn process_jpg(path: &PathBuf, args: &Args) {
+fn process_image_to_disk(path: &PathBuf, args: &Args, existing_extension: &str) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let file_path = format!("{}{}", args.output, file_name);
-    let re_jpg = Regex::new(r"\.jpeg$").unwrap();
+    let re_extension = Regex::new(r"\.[A-Za-z0-9]*$").unwrap();
     let img = image::open(&path);
     if img.is_ok() {
         let img = &img.unwrap();
-        let new_file_path = re_jpg.replace_all(file_path.as_str(), ".jpg").to_string(); //file_path.replace(".jpeg", ".jpg");
         let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
         let img = crop_image(&img, current_aspect, args.aspect_ratio);
         let img = resize_image(&img, args.max_width);
-        let buff = File::create(&new_file_path).unwrap();
-        let mut buff = BufWriter::new(buff);
-        let encoder = JpegEncoder::new_with_quality(&mut buff, args.quality);
-        let _result = img.write_with_encoder(encoder).unwrap();
-        let _result = buff.flush().unwrap();
-        copy_metadata(path.to_str().unwrap(), new_file_path.as_str())
-    }
-}
-
-
-fn process_png(path: &PathBuf, args: &Args) {
-    let file_name = path.file_name().unwrap().to_str().unwrap();
-    let new_file_path = format!("{}{}", args.output, file_name);
-    let img = image::open(path);
-    if img.is_ok() {
-        let img = &img.unwrap();
-        let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
-        let img = crop_image(&img, current_aspect, args.aspect_ratio);
-        let img = resize_image(&img, args.max_width);
-        let buff = File::create(&new_file_path).unwrap();
-        let mut buff = BufWriter::new(buff);
-        let encoder = PngEncoder::new_with_quality(&mut buff, image::codecs::png::CompressionType::Best, image::codecs::png::FilterType::Adaptive);
-        let _result = img.write_with_encoder(encoder).unwrap();
-        let _result = buff.flush().unwrap();
+        let encode = args.encode.to_lowercase();
+        let encode = encode.as_str();
+        let new_extension = if encode == "original" { existing_extension } else { encode };
+        let new_file_path = re_extension.replace_all(file_path.as_str(), ".jpg").to_string(); //file_path.replace(".jpeg", ".jpg");
+        let inner = File::create(&new_file_path).unwrap();
+        let _buff = extension_to_encoder(inner, &img, new_extension, args.quality);
         copy_metadata(path.to_str().unwrap(), new_file_path.as_str())
     }
 }
@@ -159,4 +139,21 @@ pub fn copy_metadata(source_path: &str, target_path: &str) {
     meta.clear_tag("Exif.Image.ImageLength");
     meta.clear_tag("Exif.Image.ImageWidth");
     let _result = meta.save_to_file(target_path);
+}
+
+fn extension_to_encoder<W: Write>(inner: W, img: &DynamicImage, new_extension: &str, quality: u8) -> BufWriter<W> {
+    let mut buff = BufWriter::new(inner);
+    let _result = match new_extension {
+        "png" => {
+            let encoder = PngEncoder::new_with_quality(&mut buff, image::codecs::png::CompressionType::Best, image::codecs::png::FilterType::Adaptive);
+            img.write_with_encoder(encoder)
+        }
+        "jpg" => {
+            let encoder = JpegEncoder::new_with_quality(&mut buff, quality);
+            img.write_with_encoder(encoder)
+        }
+        _ => Ok(())
+    };
+    let _result = buff.flush().unwrap();
+    return buff;
 }
