@@ -229,17 +229,7 @@ impl eframe::App for App {
                     if PROGRESS.load(Ordering::SeqCst) == 0.0
                         || PROGRESS.load(Ordering::SeqCst) == 1.0 {
                         if ui.add(button).clicked() {
-                            let args = Args {
-                                aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
-                                batch_size: self.batch_size,
-                                decode: self.decode.clone(),
-                                encode: self.encode.clone(),
-                                input: self.input.clone(),
-                                max_width: self.target_max_width,
-                                output: self.output.clone(),
-                                quality: self.jpeg_quality as u8,
-                                ui: true,
-                            };
+                            let args = build_args_from_app(self);
                             PROGRESS.swap(0.0, Ordering::SeqCst);
                             thread::spawn(move || {
                                 process_images(&args, &PROGRESS);
@@ -259,13 +249,8 @@ impl eframe::App for App {
                     for (i, col) in cols.iter_mut().enumerate() {
                         if i == 0 {
                             col.vertical(|col| {
+                                col.label(format!("Source Image: {}", self.source_file_name.as_ref().unwrap_or(&String::from("<None>"))));
                                 if self.source_file_name.is_some() && self.source_path.is_some() {
-                                    self.source_image = match image::open(self.source_path.as_ref().unwrap()) {
-                                        Ok(image) => Some(image),
-                                        Err(_) => None
-                                    };
-                                    col.label(format!("Source Image: {}", self.source_file_name.as_ref().unwrap()));
-
                                     if self.update {
                                         self.source_image = match image::open(self.source_path.as_ref().unwrap()) {
                                             Ok(image) => Some(image),
@@ -284,23 +269,11 @@ impl eframe::App for App {
                                         }
                                         None => ()
                                     }
-                                } else {
-                                    col.label("Source Image: <None>");
-                                }
+                                };
                             });
                         } else {
                             if self.preview && self.update {
-                                let args = Args {
-                                    aspect_ratio: Fraction::from_str(self.aspect_ratio.clone().as_str()).unwrap(),
-                                    batch_size: self.batch_size,
-                                    decode: self.decode.clone(),
-                                    encode: self.encode.clone(),
-                                    input: self.input.clone(),
-                                    max_width: self.target_max_width,
-                                    output: self.output.clone(),
-                                    quality: self.jpeg_quality as u8,
-                                    ui: true,
-                                };
+                                let args = build_args_from_app(self);
                                 if self.source_image.is_some() {
                                     let buffer = process_image_in_memory(&self.source_image, &args, self.existing_extension.as_str());
                                     let target_image = &load_image_from_vec(&buffer);
@@ -334,4 +307,18 @@ fn build_image_texture(name: &str, optional_image: &Option<DynamicImage>, ui: &m
         let color_image = ColorImage::from_rgba_unmultiplied(size, pixels);
         ui.ctx().load_texture(name, ImageData::Color(Arc::new(color_image)), TextureOptions::default())
     })
+}
+
+fn build_args_from_app(app: &mut App) -> Args{
+    Args {
+        aspect_ratio: Fraction::from_str(app.aspect_ratio.clone().as_str()).unwrap(),
+        batch_size: app.batch_size,
+        decode: app.decode.clone(),
+        encode: app.encode.clone(),
+        input: app.input.clone(),
+        max_width: app.target_max_width,
+        output: app.output.clone(),
+        quality: app.jpeg_quality as u8,
+        ui: true
+    }
 }
