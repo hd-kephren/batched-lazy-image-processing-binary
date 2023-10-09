@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use fraction::{Fraction, ToPrimitive};
-use image::DynamicImage;
+use image::{DynamicImage, ImageError};
 use rayon::prelude::*;
 use regex::Regex;
 
@@ -16,6 +16,7 @@ use std::sync::atomic::Ordering;
 use atomic_float::AtomicF32;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
+use image::error::{DecodingError, ImageFormatHint};
 
 pub fn process_images(args: &Args, progress: &'static AtomicF32) {
     let batch_size = args.batch_size;
@@ -148,11 +149,15 @@ fn extension_to_encoder<W: Write>(inner: W, img: &DynamicImage, new_extension: &
             let encoder = PngEncoder::new_with_quality(&mut buff, image::codecs::png::CompressionType::Best, image::codecs::png::FilterType::Adaptive);
             img.write_with_encoder(encoder)
         }
-        "jpg" => {
+        "jpg" | "jpeg" => {
             let encoder = JpegEncoder::new_with_quality(&mut buff, quality);
             img.write_with_encoder(encoder)
         }
-        _ => Ok(())
+        _ => {
+            let format_hint = ImageFormatHint::Unknown;
+            let decoding_error =  DecodingError::from_format_hint(format_hint);
+            Err(ImageError::Decoding(decoding_error))
+        }
     };
     let _result = buff.flush().unwrap();
     return buff;
