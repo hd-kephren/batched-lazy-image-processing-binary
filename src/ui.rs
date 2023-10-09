@@ -118,9 +118,6 @@ impl eframe::App for App {
                     .resizable(false)
                     .min_height(100.0)
                     .show_inside(ui, |ui| {
-                        ui.vertical_centered(|ui| {
-                            ui.heading("Settings");
-                        });
                         ui.horizontal_top(|ui| {
                             ui.set_height(20.0);
                             let mut size = ui.available_size();
@@ -142,8 +139,8 @@ impl eframe::App for App {
                                     self.file_selected = 1;
                                     let file = self.files.get(self.file_selected - 1).unwrap();
                                     let path = file.as_ref().map(|f| { f.path() }).unwrap();
-                                    let e = path.extension();
-                                    let existing_extension = String::from(e.and_then(OsStr::to_str).unwrap());
+                                    let extension = path.extension();
+                                    let existing_extension = String::from(extension.and_then(OsStr::to_str).unwrap());
                                     let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
                                     self.source_file_name = file_name;
                                     self.source_path = Some(path.clone());
@@ -155,6 +152,29 @@ impl eframe::App for App {
                                     self.update = true;
                                     self.existing_extension = existing_extension;
                                 }
+
+                            }
+                            if ui.button("Refresh").clicked() {
+                                let extensions = self.decode.split("|").collect();
+                                self.files = directory_to_files(self.input.as_str(), &extensions);
+                                self.file_count = self.files.iter().count();
+                                self.file_selected = 1;
+                                let file = self.files.get(self.file_selected - 1).unwrap();
+                                let path = file.as_ref().map(|f| { f.path() }).unwrap();
+                                let extension = path.extension();
+                                let existing_extension = String::from(extension.and_then(OsStr::to_str).unwrap());
+                                let file_name = path.file_name().map(|s| s.to_os_string().into_string().unwrap());
+                                self.source_file_name = file_name;
+                                self.source_path = Some(path.clone());
+                                self.source_image = match image::open(path) {
+                                    Ok(image) => Some(image),
+                                    Err(_) => {
+                                        self.preview = false;
+                                        None
+                                    }
+                                };
+                                self.update = true;
+                                self.existing_extension = existing_extension;
                             }
                         });
                         ui.separator();
@@ -267,7 +287,6 @@ impl eframe::App for App {
                                 col.label(format!("Source Image: {}", self.source_file_name.as_ref().unwrap_or(&String::from("<None>"))));
                                 if self.source_file_name.is_some() && self.source_path.is_some() {
                                     if self.update {
-
                                         self.source_texture = build_image_texture("source", &self.source_image, col);
                                         self.source_max_width = self.source_image.as_ref().map(|image| image.width()).unwrap_or(2048u32);
                                         self.source_min_width = if self.source_max_width < 32 { self.source_max_width / 2u32 } else { 32u32 };
@@ -321,7 +340,7 @@ fn build_image_texture(name: &str, optional_image: &Option<DynamicImage>, ui: &m
     })
 }
 
-fn build_args_from_app(app: &mut App) -> Args{
+fn build_args_from_app(app: &mut App) -> Args {
     Args {
         aspect_ratio: Fraction::from_str(app.aspect_ratio.clone().as_str()).unwrap(),
         batch_size: app.batch_size,
@@ -331,6 +350,6 @@ fn build_args_from_app(app: &mut App) -> Args{
         max_width: app.target_max_width,
         output: app.output.clone(),
         quality: app.jpeg_quality as u8,
-        ui: true
+        ui: true,
     }
 }
