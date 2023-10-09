@@ -12,6 +12,7 @@ use eframe::{egui, Renderer};
 use eframe::egui::{Align, ColorImage, ImageData, Slider, SliderOrientation, TextureHandle, TextureOptions};
 use fraction::Fraction;
 use image::{DynamicImage, EncodableLayout};
+use regex::Regex;
 
 use crate::imports::directory_to_files;
 use crate::process::{load_image_from_vec, process_images, process_image_in_memory};
@@ -132,7 +133,10 @@ impl eframe::App for App {
                                     .set_directory(&self.input)
                                     .pick_folder() {
                                     let extensions = self.decode.split("|").collect();
-                                    self.input = path.display().to_string();
+                                    let re = Regex::new(r"/+$").unwrap();
+                                    let input = path.display().to_string() + "/";
+                                    let input_with_slash = re.replace_all(input.as_str(), "/");
+                                    self.input = input_with_slash.to_string();
                                     self.files = directory_to_files(path.display().to_string().as_str(), &extensions);
                                     self.file_count = self.files.iter().count();
                                     self.file_selected = 1;
@@ -165,7 +169,10 @@ impl eframe::App for App {
                                 if let Some(path) = rfd::FileDialog::new()
                                     .set_directory(&self.output)
                                     .pick_folder() {
-                                    self.output = path.display().to_string();
+                                    let re = Regex::new(r"/+$").unwrap();
+                                    let output = path.display().to_string() + "/";
+                                    let output_with_slash = re.replace_all(output.as_str(), "/");
+                                    self.output = output_with_slash.to_string();
                                 }
                                 self.update = true;
                             }
