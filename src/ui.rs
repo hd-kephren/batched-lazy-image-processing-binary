@@ -204,7 +204,9 @@ impl eframe::App for App {
                             size.x = half_frame_width;
                             let text = egui::TextEdit::singleline(&mut self.aspect_ratio)
                                 .horizontal_align(Align::Center);
-                            ui.add_sized(size, text);
+                            if ui.add_sized(size, text).changed() {
+                                self.update = true;
+                            };
                             ui.label("Aspect Ratio");
                         });
                         ui.separator();
@@ -341,8 +343,15 @@ fn build_image_texture(name: &str, optional_image: &Option<DynamicImage>, ui: &m
 }
 
 fn build_args_from_app(app: &mut App) -> Args {
+    let aspect_ratio = match Fraction::from_str(app.aspect_ratio.clone().as_str()) {
+        Ok(ar) => ar,
+        Err(error) => {
+            println!("error [build_args_from_app] {}, returning an aspect ratio of 1.", error);
+            Fraction::from(1)
+        }
+    };
     Args {
-        aspect_ratio: Fraction::from_str(app.aspect_ratio.clone().as_str()).unwrap(),
+        aspect_ratio,
         batch_size: app.batch_size,
         decode: app.decode.clone(),
         encode: app.encode.clone(),
