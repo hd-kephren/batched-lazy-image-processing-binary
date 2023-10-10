@@ -18,6 +18,11 @@ opt-level = 1
 
 [profile.release]
 lto = "thin"
+#lto = true
+#strip = true  # Automatically strip symbols from the binary.
+#opt-level = "z"  # Optimize for size.
+#codegen-units = 1
+#panic = "abort"
 
 [dependencies]
 clap = { version = "4.4.4", features = ["derive"] }

@@ -143,14 +143,14 @@ pub fn copy_metadata(source_path: &str, target_path: &str) {
 }
 
 fn extension_to_encoder<W: Write>(inner: W, img: &DynamicImage, new_extension: &str, quality: u8) -> BufWriter<W> {
-    let png_quality = match quality {
-        50..=79 => CompressionType::Fast,
-        80..=100 => CompressionType::Best,
-        _ => CompressionType::Default
-    };
     let mut buff = BufWriter::new(inner);
     let _result = match new_extension {
         "png" => {
+            let png_quality = match quality {
+                50..=79 => CompressionType::Fast,
+                80..=100 => CompressionType::Best,
+                _ => CompressionType::Default
+            };
             let encoder = PngEncoder::new_with_quality(&mut buff, png_quality, image::codecs::png::FilterType::Adaptive);
             img.write_with_encoder(encoder)
         }

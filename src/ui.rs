@@ -12,7 +12,6 @@ use eframe::{egui, Renderer};
 use eframe::egui::{Align, ColorImage, ImageData, Slider, SliderOrientation, TextureHandle, TextureOptions};
 use fraction::Fraction;
 use image::{DynamicImage, EncodableLayout};
-use image::codecs::png::CompressionType;
 use regex::Regex;
 
 use crate::imports::directory_to_files;
@@ -27,12 +26,10 @@ pub fn run(settings: Args) {
     let _ = eframe::run_native("Batched Lazy Image Processing Binary", native_options, Box::new(|cc| Box::new(App::new(cc, settings))));
 }
 
-
 static PROGRESS: AtomicF32 = AtomicF32::new(0.0);
 
 struct App {
     jpeg_quality: u32,
-    png_quality: CompressionType,
     png_quality_display: String,
     target_max_width: u32,
     source_max_width: u32,
@@ -84,14 +81,13 @@ impl App {
             (None, None, None)
         };
         let (source_file_name, source_path, source_image) = file_name_and_path;
-        let (png_quality, png_quality_display) = match settings.quality {
-            50..=79 => (CompressionType::Fast, String::from("Fast")),
-            80..=100 => (CompressionType::Best, String::from("Best")),
-            _ => (CompressionType::Default, String::from("Default")),
+        let png_quality_display = match settings.quality {
+            50..=79 => String::from("Fast"),
+            80..=100 => String::from("Best"),
+            _ => String::from("Default"),
         };
         App {
             jpeg_quality: (settings.quality as u32),
-            png_quality,
             png_quality_display,
             target_max_width: settings.max_width,
             source_max_width: 0u32,
@@ -212,8 +208,7 @@ impl eframe::App for App {
                                     ui.selectable_value(&mut self.encode, String::from("original"), "original");
                                     ui.selectable_value(&mut self.encode, String::from("jpg"), "jpg");
                                     ui.selectable_value(&mut self.encode, String::from("png"), "png");
-                                }
-                                );
+                                });
                         });
                         ui.separator();
                         ui.horizontal_top(|ui| {
@@ -244,13 +239,12 @@ impl eframe::App for App {
                                 .orientation(SliderOrientation::Horizontal)
                                 .text(egui::RichText::new("JPEG Quality").strong())
                             ).changed() {
-                                let (png_quality, png_quality_display) = match self.jpeg_quality {
-                                    50..=79 => (CompressionType::Fast, String::from("Fast")),
-                                    80..=100 => (CompressionType::Best, String::from("Best")),
-                                    _ => (CompressionType::Default, String::from("Default")),
+                                self.png_quality_display = match self.jpeg_quality {
+                                    50..=79 => String::from("Fast"),
+                                    80..=100 => String::from("Best"),
+                                    _ => String::from("Default"),
                                 };
-                                self.png_quality = png_quality;
-                                self.png_quality_display = png_quality_display;
+                                self.update = true;
                             };
                             ui.horizontal(|ui| {
                                 ui.add_space(10.0);
