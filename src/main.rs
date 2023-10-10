@@ -1,3 +1,4 @@
+use std::fs;
 use clap::Parser;
 use indicatif::ProgressBar;
 use rayon::prelude::*;
@@ -14,6 +15,8 @@ mod structs;
 
 fn main() {
     let args = Args::parse();
+    let _result = fs::create_dir_all(&args.input);
+    let _result = fs::create_dir_all(&args.output);
     rexiv2::initialize().expect("Unable to initialize 'rexiv2'. Please check the readme.md for external requirements.");
     if args.ui {
         ui::run(args);

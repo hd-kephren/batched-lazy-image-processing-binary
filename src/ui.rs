@@ -85,9 +85,9 @@ impl App {
         };
         let (source_file_name, source_path, source_image) = file_name_and_path;
         let (png_quality, png_quality_display) = match settings.quality {
-            50..=79 => (CompressionType::Fast, "Fast".to_string()),
-            80..=100 => (CompressionType::Best, "Best".to_string()),
-            _ => (CompressionType::Default, "Default".to_string()),
+            50..=79 => (CompressionType::Fast, String::from("Fast")),
+            80..=100 => (CompressionType::Best, String::from("Best")),
+            _ => (CompressionType::Default, String::from("Default")),
         };
         App {
             jpeg_quality: (settings.quality as u32),
@@ -206,6 +206,14 @@ impl eframe::App for App {
                                 }
                                 self.update = true;
                             }
+                            egui::ComboBox::from_label(egui::RichText::new("Encoding").strong())
+                                .selected_text(&self.encode)
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut self.encode, String::from("original"), "original");
+                                    ui.selectable_value(&mut self.encode, String::from("jpg"), "jpg");
+                                    ui.selectable_value(&mut self.encode, String::from("png"), "png");
+                                }
+                                );
                         });
                         ui.separator();
                         ui.horizontal_top(|ui| {
@@ -237,9 +245,9 @@ impl eframe::App for App {
                                 .text(egui::RichText::new("JPEG Quality").strong())
                             ).changed() {
                                 let (png_quality, png_quality_display) = match self.jpeg_quality {
-                                    50..=79 => (CompressionType::Fast, "Fast".to_string()),
-                                    80..=100 => (CompressionType::Best, "Best".to_string()),
-                                    _ => (CompressionType::Default, "Default".to_string()),
+                                    50..=79 => (CompressionType::Fast, String::from("Fast")),
+                                    80..=100 => (CompressionType::Best, String::from("Best")),
+                                    _ => (CompressionType::Default, String::from("Default")),
                                 };
                                 self.png_quality = png_quality;
                                 self.png_quality_display = png_quality_display;

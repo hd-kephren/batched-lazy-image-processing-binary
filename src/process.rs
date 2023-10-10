@@ -99,7 +99,7 @@ fn process_image_to_disk(path: &PathBuf, args: &Args, existing_extension: &str) 
         let encode = args.encode.to_lowercase();
         let encode = encode.as_str();
         let new_extension = if encode == "original" { existing_extension } else { encode };
-        let new_file_path = re_extension.replace_all(file_path.as_str(), ".jpg").to_string(); //file_path.replace(".jpeg", ".jpg");
+        let new_file_path = re_extension.replace_all(file_path.as_str(), format!(".{}", new_extension)).to_string(); //file_path.replace(".jpeg", ".jpg");
         let inner = File::create(&new_file_path).unwrap();
         let _buff = extension_to_encoder(inner, &img, new_extension, args.quality);
         copy_metadata(path.to_str().unwrap(), new_file_path.as_str())
