@@ -12,6 +12,7 @@ use eframe::{egui, Renderer};
 use eframe::egui::{Align, ColorImage, ImageData, Slider, SliderOrientation, TextureHandle, TextureOptions};
 use fraction::Fraction;
 use image::{DynamicImage, EncodableLayout};
+use image::codecs::png::CompressionType;
 use regex::Regex;
 
 use crate::imports::directory_to_files;
@@ -26,10 +27,13 @@ pub fn run(settings: Args) {
     let _ = eframe::run_native("Batched Lazy Image Processing Binary", native_options, Box::new(|cc| Box::new(App::new(cc, settings))));
 }
 
+
 static PROGRESS: AtomicF32 = AtomicF32::new(0.0);
 
 struct App {
     jpeg_quality: u32,
+    png_quality: CompressionType,
+    png_quality_display: String,
     target_max_width: u32,
     source_max_width: u32,
     source_min_width: u32,
@@ -80,8 +84,15 @@ impl App {
             (None, None, None)
         };
         let (source_file_name, source_path, source_image) = file_name_and_path;
+        let (png_quality, png_quality_display) = match settings.quality {
+            50..=79 => (CompressionType::Fast, "Fast".to_string()),
+            80..=100 => (CompressionType::Best, "Best".to_string()),
+            _ => (CompressionType::Default, "Default".to_string()),
+        };
         App {
             jpeg_quality: (settings.quality as u32),
+            png_quality,
+            png_quality_display,
             target_max_width: settings.max_width,
             source_max_width: 0u32,
             source_min_width: 0u32,
@@ -152,7 +163,6 @@ impl eframe::App for App {
                                     self.update = true;
                                     self.existing_extension = existing_extension;
                                 }
-
                             }
                             if ui.button("Refresh").clicked() {
                                 let extensions = self.decode.split("|").collect();
@@ -207,26 +217,40 @@ impl eframe::App for App {
                             if ui.add_sized(size, text).changed() {
                                 self.update = true;
                             };
-                            ui.label("Aspect Ratio");
+                            ui.label(egui::RichText::new("Aspect Ratio").strong());
                         });
                         ui.separator();
                         if ui.add(Slider::new(&mut self.target_max_width, self.source_min_width..=self.source_max_width)
                             .orientation(SliderOrientation::Horizontal)
-                            .text("Maximum Width")
+                            .text(egui::RichText::new("Maximum Width").strong())
                             .trailing_fill(false)
                         ).changed() {
                             self.update = true;
                         };
                         ui.separator();
-                        if ui.add(Slider::new(&mut self.jpeg_quality, 0u32..=100u32)
-                            .clamp_to_range(true)
-                            .smart_aim(true)
-                            .trailing_fill(true)
-                            .orientation(SliderOrientation::Horizontal)
-                            .text("JPEG Quality")
-                        ).changed() {
-                            self.update = true;
-                        };
+                        ui.horizontal_top(|ui| {
+                            if ui.add(Slider::new(&mut self.jpeg_quality, 0u32..=100u32)
+                                .clamp_to_range(true)
+                                .smart_aim(true)
+                                .trailing_fill(true)
+                                .orientation(SliderOrientation::Horizontal)
+                                .text(egui::RichText::new("JPEG Quality").strong())
+                            ).changed() {
+                                let (png_quality, png_quality_display) = match self.jpeg_quality {
+                                    50..=79 => (CompressionType::Fast, "Fast".to_string()),
+                                    80..=100 => (CompressionType::Best, "Best".to_string()),
+                                    _ => (CompressionType::Default, "Default".to_string()),
+                                };
+                                self.png_quality = png_quality;
+                                self.png_quality_display = png_quality_display;
+                            };
+                            ui.horizontal(|ui| {
+                                ui.add_space(10.0);
+                                ui.label(egui::RichText::new(&self.png_quality_display).monospace());
+                                ui.add_space(10.0);
+                                ui.label(egui::RichText::new("PNG Quality").strong());
+                            });
+                        });
                         ui.add_space(5.0);
                         ui.horizontal_top(|ui| {
                             let slider = Slider::new(&mut self.file_selected, 1usize..=self.file_count)
@@ -234,7 +258,7 @@ impl eframe::App for App {
                                 .smart_aim(true)
                                 .trailing_fill(false)
                                 .orientation(SliderOrientation::Horizontal)
-                                .text(format!(" of {} Files", self.file_count));
+                                .text(egui::RichText::new(format!(" of {} Files", self.file_count)).monospace());
                             if ui.add(slider).changed() {
                                 let file = self.files.get(self.file_selected - 1).unwrap();
                                 let path = file.as_ref().map(|f| { f.path() }).unwrap();
@@ -253,7 +277,7 @@ impl eframe::App for App {
                             };
                             ui.add_space(5.0);
                             ui.vertical(|ui| {
-                                if ui.checkbox(&mut self.preview, "Live Preview").changed() {
+                                if ui.checkbox(&mut self.preview, egui::RichText::new("Live Preview").strong()).changed() {
                                     self.update = true;
                                 };
                             });
