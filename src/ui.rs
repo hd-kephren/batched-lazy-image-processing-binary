@@ -312,14 +312,13 @@ impl eframe::App for App {
                     for (i, col) in cols.iter_mut().enumerate() {
                         if i == 0 {
                             col.vertical(|col| {
-                                col.label(format!("Source Image: {}", self.source_file_name.as_ref().unwrap_or(&String::from("<None>"))));
+                                col.label(format!("Source Image: {}{}", self.input, self.source_file_name.as_ref().unwrap_or(&String::from("<None>"))));
                                 if self.source_file_name.is_some() && self.source_path.is_some() {
                                     if self.update {
                                         self.source_texture = build_image_texture("source", &self.source_image, col);
                                         self.source_max_width = self.source_image.as_ref().map(|image| image.width()).unwrap_or(2048u32);
                                         self.source_min_width = if self.source_max_width < 32 { self.source_max_width / 2u32 } else { 32u32 };
                                     };
-
                                     match &self.source_texture {
                                         Some(handle) => {
                                             egui::ScrollArea::both().show(col, |col| {
@@ -340,10 +339,12 @@ impl eframe::App for App {
                                 };
                             }
                             col.vertical(|col| {
-                                col.label(format!("Target Image: {}", self.source_file_name.as_ref().unwrap_or(&String::from("<None>"))));
+                                col.label(format!("Target Image: {}{}", self.output, self.source_file_name.as_ref().unwrap_or(&String::from("<None>"))));
                                 if self.preview {
                                     self.target_texture.as_ref().map(|target_handle| {
                                         egui::ScrollArea::both().show(col, |col| {
+                                            let size = self.source_texture.as_ref().unwrap().size_vec2();
+                                            col.set_min_size(size);
                                             col.image((target_handle.id(), target_handle.size_vec2()));
                                         });
                                     });
