@@ -15,7 +15,7 @@ use image::{DynamicImage, EncodableLayout};
 use regex::Regex;
 
 use crate::imports::directory_to_files;
-use crate::process::{load_image_from_vec, process_images, process_image_in_memory};
+use crate::process::{load_image_from_vec, process_images, process_image_in_memory, file_diff};
 use crate::structs::Args;
 
 pub fn run(settings: Args) {
@@ -302,7 +302,15 @@ impl eframe::App for App {
                         ui.add_enabled(false, button);
                     }
 
-                    ui.add(egui::ProgressBar::new(PROGRESS.load(Ordering::SeqCst)).show_percentage());
+                    let progress_widget = egui::ProgressBar::new(PROGRESS.load(Ordering::SeqCst))
+                        .desired_width(half_frame_width)
+                        .show_percentage();
+                    ui.add(progress_widget);
+                    ui.add_space(5.0);
+                    if ui.button("File Difference").clicked() {
+                        let extensions: Vec<&str> = self.decode.split("|").collect();
+                        file_diff(self.input.as_str(), self.output.as_str(), &extensions);
+                    }
                     if PROGRESS.load(Ordering::SeqCst) < 1.0 && PROGRESS.load(Ordering::SeqCst) > 0.0 {
                         ctx.request_repaint_after(Duration::from_secs(1));
                     }

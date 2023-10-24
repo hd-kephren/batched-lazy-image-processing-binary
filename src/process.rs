@@ -1,4 +1,5 @@
-use std::ffi::OsStr;
+use std::collections::HashSet;
+use std::ffi::{OsStr, OsString};
 use std::fs::{DirEntry, File};
 use std::io::BufWriter;
 use std::io::Write;
@@ -20,9 +21,9 @@ use image::error::{DecodingError, ImageFormatHint};
 
 pub fn process_images(args: &Args, progress: &'static AtomicF32) {
     let batch_size = args.batch_size;
-    let input = args.input.as_str();
+    let input_dir = args.input.as_str();
     let extensions: Vec<&str> = args.decode.split("|").collect();
-    let filtered_files = directory_to_files(&input, &extensions);
+    let filtered_files = directory_to_files(&input_dir, &extensions);
     let count = filtered_files.iter().count();
     let steps = 1.0 / count as f32;
 
@@ -160,10 +161,34 @@ fn extension_to_encoder<W: Write>(inner: W, img: &DynamicImage, new_extension: &
         }
         _ => {
             let format_hint = ImageFormatHint::Unknown;
-            let decoding_error =  DecodingError::from_format_hint(format_hint);
+            let decoding_error = DecodingError::from_format_hint(format_hint);
             Err(ImageError::Decoding(decoding_error))
         }
     };
     let _result = buff.flush().unwrap();
     return buff;
+}
+
+pub fn file_diff(input_dir: &str, output_dir: &str, extensions: &Vec<&str>) {
+    println!();
+    let input_files: HashSet<OsString> = directory_to_files(input_dir, extensions)
+        .iter()
+        .filter(|file| file.is_ok())
+        .map(|file| file.as_ref().unwrap().file_name())
+        .collect();
+    let output_files: HashSet<OsString> = directory_to_files(output_dir, extensions)
+        .iter()
+        .filter(|file| file.is_ok())
+        .map(|file| file.as_ref().unwrap().file_name())
+        .collect();
+    let result: Vec<&OsString> = input_files.symmetric_difference(&output_files).collect();
+    println!("files in input directory: {}\nfiles in output directory: {}", input_files.len(), output_files.len());
+    println!();
+    if result.is_empty() {
+        println!("No image file count difference between input and output directories.");
+    } else {
+        result.into_iter().for_each(|string| {
+            println!("{}", string.to_str().unwrap());
+        });
+    };
 }
