@@ -30,7 +30,11 @@ fn main() {
         let count = filtered_files.iter().count();
         let chunks = (count as f64 / batch_size as f64).ceil();
         println!("Processing {} files in {} chunks.", count, chunks);
-
+        if args.check {
+            println!("Checking aspect ratios rather than modifying images.");
+            println!("---------------START CSV---------------");
+            println!("filename,current_aspect,expected_aspect");
+        }
         let progress_bar = ProgressBar::new(count as u64);
         filtered_files
             .chunks(batch_size)
@@ -43,6 +47,9 @@ fn main() {
                     })
             });
         progress_bar.finish();
+        if args.check {
+            println!("----------------END CSV----------------");
+        }
         println!("\nComplete.");
     }
 }

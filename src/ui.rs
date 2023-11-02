@@ -388,6 +388,7 @@ fn build_args_from_app(app: &mut App) -> Args {
     Args {
         aspect_ratio,
         batch_size: app.batch_size,
+        check: false,
         decode: app.decode.clone(),
         encode: app.encode.clone(),
         input: app.input.clone(),

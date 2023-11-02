@@ -51,7 +51,13 @@ pub fn process_image_from_path(path: &PathBuf, args: &Args) {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     let _result = match file_extension {
         None => (),
-        Some("jpg" | "jpeg" | "png") => process_image_to_disk(path, args, file_extension.unwrap()),
+        Some("jpg" | "jpeg" | "png") => {
+            if args.check {
+                check_image_on_disk(path, args)
+            } else {
+                process_image_to_disk(path, args, file_extension.unwrap())
+            }
+        }
         Some(ext) => {
             println!("{} | Image format '{}' not supported.", file_name, ext)
         }
@@ -86,6 +92,18 @@ pub fn load_image_from_vec(vec: &Vec<u8>) -> Option<DynamicImage> {
     };
 }
 
+
+fn check_image_on_disk(path: &PathBuf, args: &Args) {
+    let file_name = path.file_name().unwrap().to_str().unwrap();
+    let img = image::open(&path);
+    if img.is_ok() {
+        let img = &img.unwrap();
+        let current_aspect = Fraction::from(img.width()) / Fraction::from(img.height());
+        if current_aspect != args.aspect_ratio {
+            println!("{},{},{}", file_name, current_aspect, args.aspect_ratio);
+        }
+    }
+}
 
 fn process_image_to_disk(path: &PathBuf, args: &Args, existing_extension: &str) {
     let file_name = path.file_name().unwrap().to_str().unwrap();

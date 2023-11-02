@@ -13,6 +13,10 @@ pub struct Args {
     #[arg(short, long, default_value = "100")]
     pub batch_size: usize,
 
+    /// Report images that are not of the set aspect ratio
+    #[arg(short, long)]
+    pub check: bool,
+
     /// Picture formats to read
     #[arg(short, long, default_value = "jpg|jpeg|png")]
     pub decode: String,
